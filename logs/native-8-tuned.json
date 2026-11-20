@@ -1,0 +1,45 @@
+{
+  "platform": "macOS-10.16-x86_64-i386-64bit",
+  "command": [
+    "build/shopping-sessions"
+  ],
+  "data": "./dev",
+  "threads": 8,
+  "filesystem_cache": "not flushed; repeated runs may be warm",
+  "includes": "process startup, all input reads, computation, Parquet writing, process exit",
+  "min_seconds": 0.8289410489960574,
+  "median_seconds": 0.8839878579892684,
+  "max_seconds": 1.2617945889942348,
+  "runs": [
+    {
+      "run": 1,
+      "wall_seconds": 1.2617945889942348,
+      "exit_code": 0,
+      "stderr": "setup=0.0686078 parse_events=0.166415 dedup_events=0.0826755 clicks=0.0440538 sessionize_aggregate=0.160629 write_parquet=0.0804123 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.603444}"
+    },
+    {
+      "run": 2,
+      "wall_seconds": 0.8289410489960574,
+      "exit_code": 0,
+      "stderr": "setup=0.0703266 parse_events=0.172409 dedup_events=0.0826668 clicks=0.0456589 sessionize_aggregate=0.148052 write_parquet=0.0608406 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.580477}"
+    },
+    {
+      "run": 3,
+      "wall_seconds": 0.8839878579892684,
+      "exit_code": 0,
+      "stderr": "setup=0.068609 parse_events=0.217588 dedup_events=0.0819734 clicks=0.0547725 sessionize_aggregate=0.149674 write_parquet=0.061679 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.634782}"
+    },
+    {
+      "run": 4,
+      "wall_seconds": 0.8651617169962265,
+      "exit_code": 0,
+      "stderr": "setup=0.0701836 parse_events=0.173711 dedup_events=0.0792183 clicks=0.0489158 sessionize_aggregate=0.171287 write_parquet=0.0700814 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.613988}"
+    },
+    {
+      "run": 5,
+      "wall_seconds": 0.8906904490140732,
+      "exit_code": 0,
+      "stderr": "setup=0.0719505 parse_events=0.183986 dedup_events=0.104339 clicks=0.0513957 sessionize_aggregate=0.153985 write_parquet=0.0638992 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.630058}"
+    }
+  ]
+}

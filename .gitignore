@@ -6,3 +6,9 @@ dev-answer/
 out/
 scratch/
 *.zip
+dev-tools/
+build/
+out-*/
+logs/*.prof
+logs/*.stdout
+logs/*.stderr

@@ -1,0 +1,33 @@
+{
+  "platform": "macOS-10.16-x86_64-i386-64bit",
+  "command": [
+    "build/shopping-sessions"
+  ],
+  "data": "./dev",
+  "threads": 8,
+  "filesystem_cache": "not flushed; repeated runs may be warm",
+  "includes": "process startup, all input reads, computation, Parquet writing, process exit",
+  "min_seconds": 1.1282618310069665,
+  "median_seconds": 1.1429414990125224,
+  "max_seconds": 1.457643061003182,
+  "runs": [
+    {
+      "run": 1,
+      "wall_seconds": 1.1429414990125224,
+      "exit_code": 0,
+      "stderr": "setup=0.0665268 parse_events=0.218218 dedup_events=0.152785 clicks=0.0659118 sessionize_aggregate=0.244621 write_parquet=0.098827 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.847522}"
+    },
+    {
+      "run": 2,
+      "wall_seconds": 1.457643061003182,
+      "exit_code": 0,
+      "stderr": "setup=0.0979576 parse_events=0.439571 dedup_events=0.166813 clicks=0.0952664 sessionize_aggregate=0.194561 write_parquet=0.107809 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":1.10276}"
+    },
+    {
+      "run": 3,
+      "wall_seconds": 1.1282618310069665,
+      "exit_code": 0,
+      "stderr": "setup=0.0872263 parse_events=0.248274 dedup_events=0.138037 clicks=0.0549419 sessionize_aggregate=0.169656 write_parquet=0.0828678 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.781515}"
+    }
+  ]
+}

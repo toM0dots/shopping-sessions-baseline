@@ -8,7 +8,18 @@ DEV   ?= dev
 FIXTURES ?= $(if $(wildcard fixtures),fixtures,../../fixtures)
 export IMAGE CPUS MEM PLATFORM
 
-.PHONY: build fixtures dev run-dev check-dev
+PYTHON ?= python3
+.PHONY: build fixtures dev run-dev check-dev native native-fixtures benchmark
+
+## Compile locally against PyArrow's bundled C++ headers and libraries
+native:
+	$(PYTHON) scripts/build_native.py
+
+native-fixtures: native
+	$(PYTHON) scripts/run_fixtures.py $(FIXTURES) -- build/shopping-sessions
+
+benchmark: native
+	$(PYTHON) scripts/benchmark.py --data $(DEV) --threads $(CPUS) --runs 5 -- build/shopping-sessions
 
 ## Build the image for the scorer's platform, linux/amd64 (emulated on Apple silicon)
 build:

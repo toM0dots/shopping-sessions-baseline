@@ -3,3 +3,12 @@ dev/
 out/
 *.md
 .git
+dev-tools/
+dev-answer/
+.venv/
+build/
+logs/
+scratch/
+out-*/
+__pycache__/
+*.zip

@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-20",
+  "os": "15.2",
+  "cpu": "Intel Core i5-1038NG7 @ 2.00GHz",
+  "physical_cores": 4,
+  "logical_cpus": 8,
+  "memory_bytes": 17179869184,
+  "python": "3.11.7",
+  "duckdb": "1.4.5",
+  "pyarrow": "19.0.1",
+  "polars": "1.38.1",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.3)",
+  "public_input_sha256_paths_and_bytes": "cb10a0509824f7500edb7289f8a5c7534da6a72610c7997501b13d314fbeea00",
+  "generator_seed": 1,
+  "requested_events": 1000000,
+  "requested_clicks": 250000,
+  "input_csv_bytes": 96210343,
+  "notes": "Native macOS measurements; filesystem cache not flushed; Docker/scorer limits not reproduced."
+}

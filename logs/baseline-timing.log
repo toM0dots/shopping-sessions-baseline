@@ -1,0 +1,17 @@
+WARNING: Logging before InitGoogleLogging() is written to STDERR
+W20261120 15:37:08.343055 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.l1dcachesize'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.343423 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.l2cachesize'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.343628 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.l3cachesize'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.343820 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.sse4_2'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.344014 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx1_0'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.344307 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx2_0'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.344714 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.bmi1'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.344923 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.bmi2'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.345105 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx512f'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.345291 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx512cd'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.345474 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx512dq'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.345657 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx512bw'. Detail: [errno 1] Operation not permitted
+W20261120 15:37:08.345840 1175540928 cpu_info.cc:239] IOError: sysctlbyname failed for 'hw.optional.avx512vl'. Detail: [errno 1] Operation not permitted
+{"user_rows": 117038, "campaign_rows": 27400, "sessions": 179366, "events": 977930, "revenue_cents": 376461330, "elapsed_seconds": 22.968220759008545}
+
+{"wall_seconds": 23.707525967009133, "exit_code": 0, "max_rss_bytes": 845328384}
