@@ -2,6 +2,7 @@ use crate::iface::*;
 use crate::parse::mul8;
 use crate::*;
 use std::arch::x86_64::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const VALID: u64 = 1 << 32;
 
@@ -26,18 +27,28 @@ pub struct CkxP {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn store_slot(csr: *mut [u64; 2], index: usize, rec: [u64; 2]) {
+    // The input contract guarantees identical values for duplicate click IDs.
+    // Different parser workers may therefore publish the same slot concurrently.
+    // Atomic words avoid a data race. Direct-index readers wait for the US_FIN
+    // barrier; partitioned heavy-bucket readers wait for their scatter barrier.
+    let slot = csr.add(index).cast::<AtomicU64>();
+    (*slot).store(rec[0], Ordering::Relaxed);
+    (*slot.add(1)).store(rec[1], Ordering::Relaxed);
+}
+
+#[inline(always)]
 pub unsafe fn flush(pd: &mut Pend, csr: *mut [u64; 2]) {
     let n = pd.n;
     for i in 0..n {
-        let r = _mm_load_si128(pd.rec.as_ptr().add(i) as *const __m128i);
-        _mm_store_si128(csr.add(*pd.at.get_unchecked(i) as usize) as *mut __m128i, r);
+        store_slot(csr, *pd.at.get_unchecked(i) as usize, *pd.rec.get_unchecked(i));
     }
     pd.n = 0;
 }
 
 #[inline(always)]
 pub unsafe fn store_one(pd: &mut Pend, csr: *mut [u64; 2], c: u64, w0: u64, u: u64) {
-    *csr.add(c as usize) = [w0, u | VALID];
+    store_slot(csr, c as usize, [w0, u | VALID]);
     pd.end = pd.end.max(c + 1);
 }
 

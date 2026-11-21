@@ -1876,6 +1876,9 @@ unsafe fn read_at(fd: i32, dst: *mut u8, n: usize, off: usize, flen: usize) -> u
     got
 }
 
+#[path = "affinity.rs"]
+mod affinity;
+
 pub(crate) fn cpu_order() -> &'static Vec<usize> {
     static O: std::sync::OnceLock<Vec<usize>> = std::sync::OnceLock::new();
     O.get_or_init(|| {
@@ -1885,36 +1888,11 @@ pub(crate) fn cpu_order() -> &'static Vec<usize> {
             return Vec::new();
         }
         let allowed: Vec<usize> = (0..1024).filter(|&c| m[c / 64] >> (c % 64) & 1 != 0).collect();
-        let mut seen = vec![false; 1024];
-        let mut out = Vec::new();
-        for &c in &allowed {
-            if seen[c] {
-                continue;
-            }
-            let sib = std::fs::read_to_string(format!("/sys/devices/system/cpu/cpu{c}/topology/thread_siblings_list")).unwrap_or_default();
-            let mut grp: Vec<usize> = Vec::new();
-            let mut has_c = false;
-            for part in sib.trim().split(',') {
-                let mut it = part.split('-').filter_map(|x| x.parse::<usize>().ok());
-                if let Some(a) = it.next() {
-                    let b = it.next().unwrap_or(a);
-                    for x in a..=b.min(1023) {
-                        has_c |= x == c;
-                        grp.push(x);
-                    }
-                }
-            }
-            if !has_c {
-                grp = vec![c];
-            }
-            for x in grp {
-                if x < 1024 && !seen[x] && m[x / 64] >> (x % 64) & 1 != 0 {
-                    seen[x] = true;
-                    out.push(x);
-                }
-            }
-        }
-        out
+        affinity::cpu_order(
+            &allowed,
+            |cpu| std::fs::read_to_string(format!("/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list")).unwrap_or_default(),
+            !std::env::var("XL_CORE_FIRST").is_ok_and(|v| v == "0"),
+        )
     })
 }
 

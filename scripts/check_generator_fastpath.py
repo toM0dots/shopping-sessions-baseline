@@ -30,7 +30,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = ("user_daily", "campaign_daily")
 WIDTHS = {"events": 7, "clicks": 4, "links": 2}
-MUTATIONS = ("shuffled", "opaque_ids", "mixed_ids", "permuted_event_ids", "cross_person_links",
+MUTATIONS = ("shuffled", "duplicate_clicks", "opaque_ids", "mixed_ids", "permuted_event_ids", "permuted_click_ids", "cross_person_links",
              "earliest_invalid", "unusual_timestamps", "unusual_catalog",
              "wide_window", "partial_output_fallback")
 
@@ -107,6 +107,27 @@ def mutate(data, name, seed):
                 path.write_bytes(header + b"\n" + b"\n".join(lines) + (b"\n" if index % 2 else b""))
                 count += len(lines)
         return {"rows_shuffled": count}
+    if name == "duplicate_clicks":
+        # Identical click copies are explicitly legal. Repeat a broad range of
+        # IDs across files/chunks so concurrent workers hit the same direct slots.
+        selected = {}
+        for fields in rows(data, "clicks"):
+            if fields[0] and fields[0] not in selected:
+                selected[fields[0]] = fields
+            if len(selected) == 2048:
+                break
+        if not selected:
+            raise ValueError("no click IDs available for duplicate-click mutation")
+        copies = list(selected.values())
+        for part in range(8):
+            rng.shuffle(copies)
+            lines = [b",".join(b'"' + field + b'"' if (part + i + j) % 2 else field
+                               for j, field in enumerate(fields))
+                     for i, fields in enumerate(copies)]
+            (data / "clicks" / f"duplicate-copy-{part}.csv").write_bytes(
+                b"click_id,user_id,campaign_id,ts\n" + b"\n".join(lines) + b"\n")
+        return {"distinct_click_ids_copied": len(copies), "additional_files": 8,
+                "additional_identical_click_rows": 8 * len(copies)}
     if name == "opaque_ids":
         columns = {"events": ((0, b"event"), (1, b"user")),
                    "clicks": ((0, b"click"), (1, b"user")),
@@ -164,12 +185,13 @@ def mutate(data, name, seed):
         return {"rows_changed": changed, "ids_renamed": {kind: len(m) for kind, m in mappings.items()},
                 "id_lengths_bytes": {kind: [len(x) for x in m.values()] for kind, m in mappings.items()},
                 "additional_later_long_id_duplicate": 1}
-    if name == "permuted_event_ids":
-        ids = sorted({f[0] for f in rows(data, "events") if f[0]})
+    if name in ("permuted_event_ids", "permuted_click_ids"):
+        kind = "events" if name == "permuted_event_ids" else "clicks"
+        ids = sorted({f[0] for f in rows(data, kind) if f[0]})
         shuffled = ids.copy()
         rng.shuffle(shuffled)
         mapping = dict(zip(ids, shuffled))
-        return {"rows_changed": rewrite(data, "events", lambda f: f.__setitem__(0, mapping.get(f[0], f[0]))),
+        return {"rows_changed": rewrite(data, kind, lambda f: f.__setitem__(0, mapping.get(f[0], f[0]))),
                 "distinct_ids_permuted": len(ids)}
     if name == "cross_person_links":
         parent = {}
@@ -368,7 +390,7 @@ def main():
                     sample["comparison"] = compare(output, reference, args.timeout)
                     if args.mode_check == "strict" and sample["mode"] == "unknown":
                         raise RuntimeError(f"seed={seed} {name} threads={threads}: missing engine trace")
-                    expected_mode = "fast" if name in ("normal", "shuffled") else (
+                    expected_mode = "fast" if name in ("normal", "shuffled", "duplicate_clicks") else (
                         "fallback" if name in ("opaque_ids", "unusual_catalog", "wide_window", "partial_output_fallback") else None)
                     if args.mode_check == "strict" and expected_mode and sample["mode"] != expected_mode:
                         raise RuntimeError(f"seed={seed} {name} threads={threads}: expected {expected_mode}, got {sample['mode']}")

@@ -1542,7 +1542,7 @@ unsafe fn scatter_a(recs: &[Rec], csr: *mut [u64; 2], u0: u64, lk: *mut u64, mut
         lo = lo.min(c | lm);
         hi = hi.max((c + 1) & !lm);
         let dst = if link != 0 { sp } else { csr.add(c as usize) };
-        *dst = [r.w1, (u0 + ((w0 >> 43) & (UBSIZE as u64 - 1))) | VALID];
+        crate::ckix::store_slot(dst, 0, [r.w1, (u0 + ((w0 >> 43) & (UBSIZE as u64 - 1))) | VALID]);
     }
     *mm = (lo as usize, hi as usize);
     nl

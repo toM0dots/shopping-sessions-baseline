@@ -1,0 +1,115 @@
+name: Fast engine paired tuning
+on:
+  push:
+    paths:
+      - '.github/workflows/fast-tuning.yml'
+      - 'fast/**'
+      - 'scripts/**'
+permissions:
+  contents: read
+jobs:
+  paired-tuning:
+    if: contains(github.event.head_commit.message, '[fast-tune]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      BASELINE_REF: fd56b794f7efe74bcb4e8d32bd653f4df923c7fb
+    steps:
+      - name: Check out the exact revision
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin "https://github.com/${REPOSITORY}.git"
+          git fetch --depth 1 origin "$REVISION" "$BASELINE_REF" c0bcee19170616f31e54656a65466e37aca8255d
+          git checkout --detach "$REVISION"
+      - name: Install checker dependencies and inspect topology
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r requirements-dev.txt
+          lscpu
+          lscpu --extended=CPU,CORE,SOCKET,ONLINE
+      - name: Check affinity and fallback cleanup
+        run: |
+          rustc --edition=2021 --test fast/src/affinity.rs -o /tmp/affinity-test
+          /tmp/affinity-test
+          rustc --edition=2021 --test fast/src/fallback.rs -o /tmp/fallback-test
+          /tmp/fallback-test
+      - name: Build candidate production image
+        run: docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
+      - name: Build original fast engine over the same runtime image
+        run: |
+          mkdir -p build/tuning-baseline/source build/tuning-baseline/overlay
+          git archive "$BASELINE_REF" fast Dockerfile .dockerignore > build/tuning-baseline/source.tar
+          tar -xf build/tuning-baseline/source.tar -C build/tuning-baseline/source
+          docker build --target fast-builder -t shopping-sessions:original-fast-build build/tuning-baseline/source
+          cid=$(docker create shopping-sessions:original-fast-build)
+          docker cp "$cid:/fast-bin/shopping-sessions-fast" build/tuning-baseline/overlay/shopping-sessions-fast
+          docker rm "$cid"
+          git show "$BASELINE_REF:pipeline/dispatch.cpp" | cmp - pipeline/dispatch.cpp
+          git show "$BASELINE_REF:pipeline/native.cpp" | cmp - pipeline/native.cpp
+          cat > build/tuning-baseline/overlay/Dockerfile <<'DOCKER'
+          FROM shopping-sessions:ci
+          COPY shopping-sessions-fast /app/build/shopping-sessions-fast
+          DOCKER
+          docker build -t shopping-sessions:original-fast build/tuning-baseline/overlay
+      - name: Run isolated official fixtures
+        env:
+          IMAGE: shopping-sessions:ci
+          CPUS: '2'
+          MEM: 6g
+        run: .venv/bin/python scripts/run_fixtures.py fixtures -- scripts/docker_run.sh
+      - name: Prepare official generator and candidate binaries
+        run: .venv/bin/python scripts/benchmark_fastpath.py --prepare-only
+      - name: Check independent reference and public golden outputs
+        run: |
+          .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \
+            --baseline build/fastpath-ci/bin/shopping-sessions \
+            --report logs/generator-tuning-validation.json
+          .venv/bin/python scripts/check_public_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \
+            --report logs/public-generator-tuning.json
+      - name: Profile complete execution phases
+        run: |
+          .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
+            --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-profile \
+            --baseline-env XL_TIMING=1 --candidate-env XL_TIMING=1 \
+            --case 17:20000000:1 --case 948307:60000000:1 --report logs/linux-fast-tuning-profile.json
+      - name: Compare core-first placement against the scored engine
+        run: |
+          .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
+            --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-affinity \
+            --case 17:20000000:5 --case 8675309:20000000:5 --case 948307:60000000:3 \
+            --report logs/linux-fast-tuning-affinity.json
+      - name: Compare direct click indexing against the scored engine
+        continue-on-error: true
+        run: |
+          .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
+            --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-click-index \
+            --candidate-env XL_CKIX=1 --case 17:20000000:5 --case 8675309:20000000:5 --case 948307:60000000:3 \
+            --report logs/linux-fast-tuning-click-index.json
+      - name: Compare click indexing with original worker placement
+        continue-on-error: true
+        run: |
+          .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
+            --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-click-affinity-control \
+            --candidate-env XL_CKIX=1 --candidate-env XL_CORE_FIRST=0 --case 17:20000000:3 --case 8675309:20000000:3 \
+            --report logs/linux-fast-tuning-click-affinity-control.json
+      - name: Compare fewer workers at the same CPU limit
+        continue-on-error: true
+        run: |
+          .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
+            --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-workers \
+            --candidate-env NCPU=2 --case 17:20000000:3 --case 8675309:20000000:3 \
+            --report logs/linux-fast-tuning-workers.json
+      - name: Check click indexing against independent and public answers
+        run: |
+          .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate 'env XL_CKIX=1 build/fastpath-ci/bin/shopping-sessions-dispatch' \
+            --baseline build/fastpath-ci/bin/shopping-sessions \
+            --report logs/generator-click-index-validation.json
+          .venv/bin/python scripts/check_public_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate 'env XL_CKIX=1 build/fastpath-ci/bin/shopping-sessions-dispatch' \
+            --report logs/public-click-index-validation.json
