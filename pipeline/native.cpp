@@ -1732,9 +1732,17 @@ static int run() {
             }
             auto &rows = user_rows[worker];
             auto &daily = campaign_rows[worker];
-            std::vector<I64> category_revenue(categories.size());
-            std::vector<uint32_t> active_counts(campaigns.size()), positions(campaigns.size()),
-                active;
+            // Per-thread scratch, reused across this thread's pieces. Category
+            // totals are all zero between user-days; only touched ones are reset.
+            static thread_local std::vector<I64> category_revenue;
+            static thread_local std::vector<uint32_t> active_counts, positions, active, touched;
+            if (category_revenue.size() != categories.size())
+                category_revenue.assign(categories.size(), 0);
+            if (active_counts.size() != campaigns.size()) {
+                active_counts.assign(campaigns.size(), 0);
+                positions.assign(campaigns.size(), 0);
+                active.clear();
+            }
             for (uint32_t person = 0; person < np; ++person) {
                 size_t at = event_start[person], end = event_start[person + 1];
                 size_t ci = click_start[person], ce = click_start[person + 1];
@@ -1744,8 +1752,9 @@ static int run() {
                 size_t left = ci, right = ci;
                 while (at < end) {
                     int32_t day = floor_day(events[at].ts);
+                    // Events are in time order, so this day lasts until day_end.
+                    I64 day_end = (I64(day) + 1) * DAY;
                     UserRow row{people_here.name(person), day, 0, 0, 0, -1};
-                    std::fill(category_revenue.begin(), category_revenue.end(), 0);
                     do {
                         I64 start = events[at].ts, previous = start, rev = 0;
                         size_t j = at;
@@ -1753,8 +1762,11 @@ static int run() {
                             auto &e = events[j];
                             previous = e.ts;
                             rev += e.cents;
-                            if (e.cents)
+                            if (e.cents) {
+                                if (!category_revenue[e.category])
+                                    touched.push_back(e.category);
                                 category_revenue[e.category] += e.cents;
+                            }
                             ++j;
                         } while (j < end && events[j].ts - previous <= 1800000);
                         ++row.sessions;
@@ -1784,14 +1796,16 @@ static int run() {
                         for (auto c : active)
                             ++daily.get(c, day).assists;
                         at = j;
-                    } while (at < end && floor_day(events[at].ts) == day);
-                    for (size_t c = 0; c < categories.size(); ++c)
-                        if (category_revenue[c] &&
-                            (row.category < 0 ||
-                             category_revenue[c] > category_revenue[row.category] ||
-                             (category_revenue[c] == category_revenue[row.category] &&
-                              categories[c] < categories[row.category])))
-                            row.category = c;
+                    } while (at < end && events[at].ts < day_end);
+                    // Highest revenue, ties to the byte-wise smallest category.
+                    for (auto c : touched)
+                        if (row.category < 0 || category_revenue[c] > category_revenue[row.category] ||
+                            (category_revenue[c] == category_revenue[row.category] &&
+                             categories[c] < categories[row.category]))
+                            row.category = int32_t(c);
+                    for (auto c : touched)
+                        category_revenue[c] = 0;
+                    touched.clear();
                     rows.push_back(row);
                 }
             }
