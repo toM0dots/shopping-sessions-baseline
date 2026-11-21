@@ -89,59 +89,135 @@ struct Hash {
 };
 template <class T> using Map = std::unordered_map<SV, T, Hash>;
 
-// An ID held by value when it has at most 15 bytes (every generated ID has at
-// most 9), else a pointer into the mapped input. Short keys keep their bytes in
-// memory order with the length in byte 15, so equality is two word compares and
-// byte-wise order is a big-endian compare of the two words, with no read of
-// cold input. Long keys fall back to comparing the referenced bytes. Exact both
-// ways: a short and a long key never have the same length.
-static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "Key stores the length in byte 15");
-struct Key {
-    uint64_t lo = 0, hi = 0;
-    static constexpr uint64_t LONG = uint64_t(0xFF) << 56;
-    static Key of(SV s) {
-        Key k;
-        if (s.size() <= 15) {
-            char bytes[16] = {};
-            std::memcpy(bytes, s.data(), s.size());
-            std::memcpy(&k.lo, bytes, 8);
-            std::memcpy(&k.hi, bytes + 8, 8);
-            k.hi |= uint64_t(s.size()) << 56;
-        } else {
-            k.lo = reinterpret_cast<uintptr_t>(s.data());
-            k.hi = LONG | s.size();
+// Process-lifetime copies of the IDs that Key cannot pack, length-prefixed.
+// Each thread fills its own 1 MiB chunk, so copying needs no lock except to
+// register a new chunk. Generated data almost never needs one.
+class FallbackIds {
+    std::mutex lock;
+    std::vector<std::unique_ptr<char[]>> chunks;
+    static thread_local char *cursor;
+    static thread_local size_t left;
+
+  public:
+    const char *copy(SV s) {
+        size_t need = (4 + s.size() + 7) & ~size_t(7);
+        if (need > left) {
+            size_t size = std::max<size_t>(size_t(1) << 20, need);
+            std::unique_ptr<char[]> chunk(new char[size]);
+            cursor = chunk.get();
+            left = size;
+            std::lock_guard<std::mutex> guard(lock);
+            chunks.push_back(std::move(chunk));
         }
-        return k;
+        char *out = cursor;
+        uint32_t n = uint32_t(s.size());
+        std::memcpy(out, &n, 4);
+        std::memcpy(out + 4, s.data(), s.size());
+        cursor += need;
+        left -= need;
+        return out;
     }
-    bool is_short() const { return (hi & LONG) != LONG; }
-    bool empty() const { return !lo && !hi; }
-    size_t size() const { return is_short() ? size_t(hi >> 56) : size_t(hi & ~LONG); }
-    // Views a short key's own bytes: valid only while this Key is alive.
-    SV view() const {
-        if (is_short())
-            return SV(reinterpret_cast<const char *>(this), size_t(hi >> 56));
-        return SV(reinterpret_cast<const char *>(uintptr_t(lo)), size_t(hi & ~LONG));
+    static SV text(const char *copy) {
+        uint32_t n;
+        std::memcpy(&n, copy, 4);
+        return SV(copy + 4, n);
+    }
+};
+thread_local char *FallbackIds::cursor = nullptr;
+thread_local size_t FallbackIds::left = 0;
+static FallbackIds fallback_ids;
+
+// An ID in 8 bytes. Every generated ID is one byte followed by 1 to 8
+// characters of [0-9a-z] (u..., e..., k...); such an ID is packed exactly:
+// bit 63 set, the first byte in bits 45-52, the digit count minus one in bits
+// 42-44 and the base-36 value in bits 0-41. Equality is one integer compare.
+// Any other ID is a pointer to a length-prefixed copy (bit 63 clear). A string
+// either always packs or never does, so a packed key never equals a copied one.
+// Zero is the empty key: no stored ID is empty.
+struct Key {
+    uint64_t v = 0;
+    static constexpr uint64_t PACKED = uint64_t(1) << 63, VALUE = (uint64_t(1) << 42) - 1;
+    static const std::array<uint8_t, 256> &digits() {
+        static const std::array<uint8_t, 256> table = [] {
+            std::array<uint8_t, 256> t{};
+            t.fill(0xFF);
+            for (int c = 0; c < 10; ++c)
+                t['0' + c] = uint8_t(c);
+            for (int c = 0; c < 26; ++c)
+                t['a' + c] = uint8_t(10 + c);
+            return t;
+        }();
+        return table;
+    }
+    static Key of(SV s) {
+        if (s.size() >= 2 && s.size() <= 9) {
+            auto &d = digits();
+            uint64_t value = 0;
+            bool packable = true;
+            for (size_t i = 1; i < s.size(); ++i) {
+                uint8_t digit = d[uint8_t(s[i])];
+                packable &= digit != 0xFF;
+                value = value * 36 + (digit & 63);
+            }
+            if (packable)
+                return Key{PACKED | uint64_t(uint8_t(s[0])) << 45 | uint64_t(s.size() - 2) << 42 | value};
+        }
+        return Key{reinterpret_cast<uintptr_t>(fallback_ids.copy(s))};
+    }
+    bool empty() const { return !v; }
+    bool packed() const { return v & PACKED; }
+    // The ID's bytes: written into buf when packed, else the stored copy.
+    SV text(char (&buf)[16]) const {
+        if (!packed())
+            return v ? FallbackIds::text(reinterpret_cast<const char *>(uintptr_t(v))) : SV();
+        static const char alphabet[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+        size_t count = ((v >> 42) & 7) + 1;
+        uint64_t value = v & VALUE;
+        buf[0] = char((v >> 45) & 0xFF);
+        for (size_t i = count; i > 0; --i) {
+            buf[i] = alphabet[value % 36];
+            value /= 36;
+        }
+        return SV(buf, count + 1);
+    }
+    size_t size() const {
+        char buf[16];
+        return text(buf).size();
     }
     bool operator==(const Key &o) const {
-        if (lo == o.lo && hi == o.hi)
+        if (v == o.v)
             return true;
-        return !is_short() && !o.is_short() && view() == o.view();
+        if (packed() || o.packed() || !v || !o.v)
+            return false;
+        char a[16], b[16];
+        return text(a) == o.text(b);
     }
     bool operator!=(const Key &o) const { return !(*this == o); }
+    // Byte-wise order. Packed keys compare by first byte, then by the digits
+    // left-aligned to eight places (base-36 digits sort like their ASCII
+    // bytes), then by length, so a prefix sorts first.
     bool operator<(const Key &o) const {
-        if (is_short() && o.is_short()) {
-            uint64_t a = __builtin_bswap64(lo), b = __builtin_bswap64(o.lo);
-            return a != b ? a < b : __builtin_bswap64(hi) < __builtin_bswap64(o.hi);
-        }
-        return view() < o.view();
+        if (packed() && o.packed())
+            return order(v) < order(o.v);
+        char a[16], b[16];
+        return text(a) < o.text(b);
+    }
+    static uint64_t order(uint64_t v) {
+        static const uint64_t scale[9] = {1, 36, 1296, 46656, 1679616, 60466176, 2176782336ULL,
+                                          78364164096ULL, 2821109907456ULL};
+        uint64_t count = ((v >> 42) & 7) + 1;
+        return ((v >> 45) & 0xFF) << 48 | ((v & VALUE) * scale[8 - count]) << 3 | (count - 1);
     }
     uint64_t hash() const {
-        if (!is_short())
-            return Hash{}(view());
-        uint64_t h = mum(lo ^ 0xe7037ed1a0b428dbULL, hi ^ 0x8ebc6af09c88c6e3ULL);
+        if (!packed()) {
+            char buf[16];
+            return Hash{}(text(buf));
+        }
+        uint64_t h = mum(v ^ 0xe7037ed1a0b428dbULL, 0x8ebc6af09c88c6e3ULL);
         return mum(h ^ 0xa0761d6478bd642fULL, 0x589965cc75374cc3ULL);
     }
 };
+static_assert(sizeof(Key) == 8);
 
 // Read-only copy of a small string map for per-row lookups: one contiguous,
 // cache-resident probe sequence instead of a modulo and a node chain. An
@@ -589,7 +665,7 @@ struct PersonRef {
 // hash-sharded tables in parallel, and union-find then runs on dense integers.
 // Afterwards every table is read-only and serves identity queries directly.
 class Identity {
-    // While building, canon.lo holds the ID's dense index; afterwards canon is
+    // While building, canon.v holds the ID's dense index; afterwards canon is
     // the person's canonical ID, so a hit resolves within this one entry. Empty
     // keys never occur (links with an empty side are dropped) and mark free slots.
     struct Entry {
@@ -652,10 +728,10 @@ class Identity {
                     auto &e = sh.table[i];
                     if (e.key.empty()) {
                         e.key = r.key;
-                        e.canon.lo = nm.size();
+                        e.canon.v = nm.size();
                         nm.push_back(r.key);
                     }
-                    sides[size_t(pairs[j]) * 2 + r.slot] = uint64_t(shard) << 32 | e.canon.lo;
+                    sides[size_t(pairs[j]) * 2 + r.slot] = uint64_t(shard) << 32 | e.canon.v;
                 }
                 std::vector<Ref>().swap(refs[j][shard]);
             }
@@ -672,7 +748,7 @@ class Identity {
             std::copy(local_names[shard].begin(), local_names[shard].end(), names.begin() + base);
             for (auto &e : shards[shard].table)
                 if (!e.key.empty())
-                    e.canon.lo += base;
+                    e.canon.v += base;
         });
         auto global = [&](uint64_t side) { return shards[side >> 32].base + uint32_t(side); };
         std::vector<uint32_t> parent(total);
@@ -719,7 +795,7 @@ class Identity {
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             for (auto &e : shards[shard].table)
                 if (!e.key.empty())
-                    e.canon = names[best[parent[uint32_t(e.canon.lo)]].load(std::memory_order_relaxed)];
+                    e.canon = names[best[parent[uint32_t(e.canon.v)]].load(std::memory_order_relaxed)];
         });
         std::vector<Key>().swap(names);
     }
@@ -767,7 +843,7 @@ struct ClickRec {
     I64 ts;
     uint32_t campaign;
 };
-static_assert(sizeof(EventRec) == 32 && sizeof(DedupRec) == 32 && sizeof(ClickRec) == 48);
+static_assert(sizeof(EventRec) == 24 && sizeof(DedupRec) == 24 && sizeof(ClickRec) == 32);
 // After interning, each person's records are grouped by a counting sort and
 // only the short per-person runs are ordered by time.
 struct CompactEvent {
@@ -1013,7 +1089,6 @@ static void write_users(const fs::path &path,
         n += results[s].size();
         for (auto &r : results[s])
             bytes += r.person.size();
-    // Short names are stored inside each row, so views of them stay valid here.
     }
     check(user.Reserve(n));
     check(user.ReserveData(bytes));
@@ -1024,8 +1099,9 @@ static void write_users(const fs::path &path,
     check(revenue.Reserve(n));
     for (size_t s = first; s < last; ++s)
         for (auto &r : results[s]) {
-            SV name = r.person.view();
-            user.UnsafeAppend(name.data(), name.size());
+            char buf[16];
+            SV name = r.person.text(buf);
+            check(user.Append(name.data(), name.size()));
             day.UnsafeAppend(r.day);
             sessions.UnsafeAppend(r.sessions);
             events.UnsafeAppend(r.events);
