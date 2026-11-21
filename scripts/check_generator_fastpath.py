@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TABLES = ("user_daily", "campaign_daily")
 WIDTHS = {"events": 7, "clicks": 4, "links": 2}
 MUTATIONS = ("shuffled", "duplicate_clicks", "opaque_ids", "mixed_ids", "permuted_event_ids", "permuted_click_ids", "cross_person_links",
-             "earliest_invalid", "unusual_timestamps", "unusual_catalog",
+             "earliest_invalid", "purchase_boundaries", "unusual_timestamps", "unusual_catalog",
              "wide_window", "partial_output_fallback")
 
 
@@ -245,6 +245,62 @@ def mutate(data, name, seed):
         (data / "events/mutation.csv").write_bytes(
             b"event_id,user_id,ts,ingest_ts,event_type,product_id,price_cents\n" + b"\n".join(added) + b"\n")
         return {"valid_events_poisoned_by_earlier_invalid_copy": len(added)}
+    if name == "purchase_boundaries":
+        # Exercise the purchase parser while keeping enough ordinary generated
+        # IDs for key recovery. Mutate every copy of an event consistently.
+        prices = (b"1", b"0", b"10000000", b"99999999", b"00000001",
+                  b"010000000", b"100000000", b"0010000000", b"1000000000",
+                  b"-1", b"1.0", b"price", b"")
+        known = set()
+        for line in (data / "products.csv").read_bytes().split(b"\n")[1:]:
+            parsed = parse_row(line, 2)
+            if parsed is not None:
+                known.add(parsed[0][0])
+        unknown = [(b"boundary-prod-" + b"x" * size)[:size] for size in (15, 24, 40)]
+        if any(product in known for product in unknown):
+            raise ValueError("purchase-boundary product unexpectedly exists in catalog")
+        combinations = [(price, product, quoted) for quoted in (False, True)
+                        for product in (None, *unknown) for price in prices]
+        winners = {}
+        for fields in rows(data, "events"):
+            eid = fields[0]
+            if eid and (eid not in winners or fields[3] < winners[eid][3]):
+                winners[eid] = fields
+        manifest = json.loads((data / "manifest.json").read_text())
+        lo, hi = (f1(manifest[k].encode()) for k in ("window_start", "window_end"))
+        selected = {}
+        for eid, fields in winners.items():
+            if fields[4] != b"purchase" or not fields[1] or fields[5] not in known:
+                continue
+            try:
+                ts, ingest = f1(fields[2]), f1(fields[3])
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if not (lo <= ts < hi and ingest - ts <= timedelta(days=1)):
+                continue
+            price, product, quoted = combinations[len(selected)]
+            selected[eid] = (price, fields[5] if product is None else product, quoted)
+            if len(selected) == len(combinations):
+                break
+        if len(selected) != len(combinations):
+            raise ValueError(f"need {len(combinations)} valid purchases for price/product boundaries; got {len(selected)}")
+        changed = 0
+        for path, header, lines in documents(data, "events"):
+            for i, line in enumerate(lines):
+                parsed = parse_row(line, WIDTHS["events"])
+                if parsed is None or parsed[0][0] not in selected:
+                    continue
+                fields, _ = parsed
+                price, product, quoted = selected[fields[0]]
+                fields[5], fields[6] = product, price
+                lines[i] = b",".join(b'"' + field + b'"' if quoted else field for field in fields)
+                changed += 1
+            path.write_bytes(header + b"\n" + b"\n".join(lines) + b"\n")
+        return {"distinct_purchase_events_changed": len(selected), "event_copies_changed": changed,
+                "price_values": [price.decode() for price in prices],
+                "unknown_product_lengths_bytes": [len(product) for product in unknown],
+                "known_product_cases": 2 * len(prices),
+                "quoted_cases": len(combinations) // 2, "unquoted_cases": len(combinations) // 2}
     if name == "unusual_timestamps":
         counts = {}
         for kind, col in (("events", 2), ("clicks", 3)):

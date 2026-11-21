@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "success": false,
+  "mode_checks": "strict",
+  "seeds": [
+    41,
+    73
+  ],
+  "events_requested": 100000,
+  "threads": [
+    1,
+    4,
+    8
+  ],
+  "candidate": [
+    "build/fastpath-ci/bin/shopping-sessions-dispatch"
+  ],
+  "baseline": [
+    "build/fastpath-ci/bin/shopping-sessions"
+  ],
+  "reference": [
+    "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/.venv/bin/python",
+    "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/pipeline/pipeline.py"
+  ],
+  "work_dir": "/tmp/generator-fastpath-uoa4a99j",
+  "cases": [
+    {
+      "seed": 41,
+      "name": "normal",
+      "mutation": {},
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "baseline",
+          "elapsed_seconds_diagnostic_only": 0.10280551699997886,
+          "stderr": "[engine] baseline\nsetup=0.0125674 parse=0.0153628 dedup_events=0.00128761 resolve=0.0419977 sessionize_aggregate=0.0169535 write_parquet=0.00660526 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0948131}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.09280433599997195,
+        "stderr": "setup=0.0131446 parse=0.0152128 dedup_events=0.00155168 resolve=0.0306625 sessionize_aggregate=0.0170953 write_parquet=0.0066167 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0843467}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    }
+  ],
+  "error": "RuntimeError: seed=41 normal threads=1: expected fast, got baseline",
+  "run_count": 1,
+  "mode_counts": {
+    "baseline": 1
+  },
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44953440549",
+  "host_cpu": "AMD EPYC 7763",
+  "note": "No fast-engine benchmark ran: this runner lacks AVX-512. The compared fallback output matched; strict fast-path validation correctly rejected the host."
+}

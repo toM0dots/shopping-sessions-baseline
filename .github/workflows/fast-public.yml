@@ -18,6 +18,8 @@ permissions:
   contents: read
 jobs:
   public-golden:
+    # The paired tuning job runs this exact golden checker on its compatible host.
+    if: "!contains(github.event.head_commit.message, '[fast-tune]')"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

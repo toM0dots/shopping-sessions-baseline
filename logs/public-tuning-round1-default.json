@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "success": true,
+  "answer_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/dev-answer.zip",
+  "answer_source": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/dev-answer.zip",
+  "expected_sha256": {
+    "user_daily.csv": "ea8d4b9cab25bf06bea7a4fec1d8b1520e5002b7f7c4153c256f607b90c9798b",
+    "campaign_daily.csv": "5b8f728ac09a8b179d265ca0ca231f9d38d24ac3e885285d6ba956a5bcda14e5"
+  },
+  "seed": 1,
+  "events_requested": 1000000,
+  "clicks_requested": 250000,
+  "candidate": [
+    "build/fastpath-ci/bin/shopping-sessions-dispatch"
+  ],
+  "mode_checks": "strict",
+  "work_dir": "/tmp/public-fastpath-1lj2ely9",
+  "runs": [
+    {
+      "threads": 1,
+      "exit_code": 0,
+      "mode": "fast",
+      "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=1.1 s.sample=0.8 maps+keys=0.1 lookups=0.0 setup=0.0 parse=20.4 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=4.6 stitch=0.0 ev3b=0.3 c.pre=0.0 write=2.5 total=30.4 peak_rss_kb=54316\n[v2b] prof (thread-ms): scatter=1.5 compact=0.3 runs=2.5 st2b=1.2 st2b_max_bucket=0.2 st2b_pass1=0.3 st2b_pass2=0.4 st2b_sort=0.5\n[v2b] rows: events=1071554 clicks=255069 links=44658 | kept valid: simple=958570 complex=11007 odd=8363 | runs=33333 sessions=179366 user_rows=117038 uf_nodes=1473 cx_users=313 joined=32 nb=40 nub=21\n[v2b] exit at 30.4 ms\n",
+      "comparison": "user_daily: rows 117038 vs 117038; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 27400 vs 27400; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    },
+    {
+      "threads": 8,
+      "exit_code": 0,
+      "mode": "fast",
+      "stderr": "[engine] fast\n[v2b] ms: s.list=0.7 s.mmap=6.7 s.sample=0.0 maps+keys=0.1 lookups=0.0 setup=0.0 parse=10.7 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=11.0 stitch=0.0 ev3b=3.0 c.pre=0.0 write=8.4 total=40.6 peak_rss_kb=278844\n[v2b] prof (thread-ms): scatter=6.0 compact=1.6 runs=42.6 st2b=1.8 st2b_max_bucket=0.5 st2b_pass1=0.4 st2b_pass2=0.8 st2b_sort=0.6\n[v2b] rows: events=1071554 clicks=255069 links=44658 | kept valid: simple=958570 complex=11007 odd=8363 | runs=33333 sessions=179366 user_rows=117038 uf_nodes=1473 cx_users=313 joined=32 nb=40 nub=21\n[v2b] exit at 40.7 ms\n",
+      "comparison": "user_daily: rows 117038 vs 117038; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 27400 vs 27400; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    }
+  ],
+  "golden_tables": {
+    "user_daily.csv": {
+      "member": "dev-answer/user_daily.csv",
+      "sha256": "ea8d4b9cab25bf06bea7a4fec1d8b1520e5002b7f7c4153c256f607b90c9798b",
+      "bytes": 3496396
+    },
+    "campaign_daily.csv": {
+      "member": "dev-answer/campaign_daily.csv",
+      "sha256": "5b8f728ac09a8b179d265ca0ca231f9d38d24ac3e885285d6ba956a5bcda14e5",
+      "bytes": 947700
+    }
+  },
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44954335639",
+  "validated_source_commit": "291a066f8f78b317bfe2351509bc64b97ded64b8"
+}

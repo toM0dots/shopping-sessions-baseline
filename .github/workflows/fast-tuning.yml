@@ -81,6 +81,7 @@ jobs:
       - name: Prepare official generator and candidate binaries
         run: .venv/bin/python scripts/benchmark_fastpath.py --prepare-only
       - name: Check independent reference and public golden outputs
+        if: "!contains(github.event.head_commit.message, '[parser-sweep]')"
         run: |
           .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
             --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \
@@ -90,18 +91,21 @@ jobs:
             --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \
             --report logs/public-generator-tuning.json
       - name: Profile complete execution phases
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
             --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-profile \
             --baseline-env XL_TIMING=1 --candidate-env XL_TIMING=1 \
             --case 17:20000000:1 --case 948307:60000000:1 --report logs/linux-fast-tuning-profile.json
-      - name: Compare core-first placement against the scored engine
+      - name: Compare production defaults against the scored engine
+        if: "!contains(github.event.head_commit.message, '[parser-sweep]')"
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
             --generator build/fastpath-ci/generator-target/release/generate --work build/tuning-affinity \
             --case 17:20000000:5 --case 8675309:20000000:5 --case 948307:60000000:3 \
             --report logs/linux-fast-tuning-affinity.json
       - name: Compare direct click indexing against the scored engine
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         continue-on-error: true
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
@@ -109,6 +113,7 @@ jobs:
             --candidate-env XL_CKIX=1 --case 17:20000000:5 --case 8675309:20000000:5 --case 948307:60000000:3 \
             --report logs/linux-fast-tuning-click-index.json
       - name: Compare click indexing with original worker placement
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         continue-on-error: true
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
@@ -116,6 +121,7 @@ jobs:
             --candidate-env XL_CKIX=1 --candidate-env XL_CORE_FIRST=0 --case 17:20000000:3 --case 8675309:20000000:3 \
             --report logs/linux-fast-tuning-click-affinity-control.json
       - name: Compare fewer workers at the same CPU limit
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         continue-on-error: true
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
@@ -123,6 +129,7 @@ jobs:
             --candidate-env NCPU=2 --case 17:20000000:3 --case 8675309:20000000:3 \
             --report logs/linux-fast-tuning-workers.json
       - name: Check click indexing against independent and public answers
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         run: |
           .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
             --candidate 'env XL_CKIX=1 build/fastpath-ci/bin/shopping-sessions-dispatch' \
@@ -132,6 +139,7 @@ jobs:
             --candidate 'env XL_CKIX=1 build/fastpath-ci/bin/shopping-sessions-dispatch' \
             --report logs/public-click-index-validation.json
       - name: Compare batched input release against the scored engine
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         continue-on-error: true
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
@@ -139,6 +147,7 @@ jobs:
             --candidate-env XL_REL_BATCH=8 --case 17:20000000:3 --case 8675309:20000000:3 --case 948307:60000000:2 \
             --report logs/linux-fast-tuning-release.json
       - name: Compare combined click indexing and batched release
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         continue-on-error: true
         run: |
           .venv/bin/python scripts/benchmark_fastpath.py --baseline-image shopping-sessions:original-fast --baseline-ref "$BASELINE_REF" \
@@ -147,8 +156,79 @@ jobs:
             --case 17:20000000:3 --case 8675309:20000000:3 --case 948307:60000000:2 \
             --report logs/linux-fast-tuning-combined.json
       - name: Validate batched release and explicit pread through exact references
+        if: "!contains(github.event.head_commit.message, '[fast-promote]')"
         run: |
           .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
             --candidate 'env XL_CKIX=1 XL_REL_BATCH=8 XL_RD=256 build/fastpath-ci/bin/shopping-sessions-dispatch' \
             --baseline build/fastpath-ci/bin/shopping-sessions \
             --report logs/generator-combined-pread-validation.json
+      - name: Build isolated parser compile variants
+        if: contains(github.event.head_commit.message, '[parser-sweep]')
+        run: |
+          .venv/bin/python scripts/build_fast_variant.py --tag shopping-sessions:bb14 --set XL_BB=14 --report logs/fast-variant-bb14.json
+          .venv/bin/python scripts/build_fast_variant.py --tag shopping-sessions:sub8192 --set XL_SUB_DEF=8192 --report logs/fast-variant-sub8192.json
+          .venv/bin/python scripts/build_fast_variant.py --tag shopping-sessions:inline-purchase --set XL_INLINE_PURCHASE=1 --report logs/fast-variant-inline-purchase.json
+      - name: Screen parser and I/O variants with complete output comparisons
+        if: contains(github.event.head_commit.message, '[parser-sweep]')
+        run: |
+          .venv/bin/python scripts/sweep_fast_parser.py \
+            --generator build/fastpath-ci/generator-target/release/generate \
+            --baseline-ref "$BASELINE_REF" --purchase-image shopping-sessions:inline-purchase
+      - name: Validate the inline purchase parser against independent answers
+        if: contains(github.event.head_commit.message, '[parser-sweep]')
+        run: |
+          cp build/fastpath-ci/bin/shopping-sessions build/fastpath-ci/bin/shopping-sessions-dispatch build/fast-variants/shopping-sessions_inline-purchase/
+          .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate build/fast-variants/shopping-sessions_inline-purchase/shopping-sessions-dispatch \
+            --baseline build/fastpath-ci/bin/shopping-sessions \
+            --report logs/generator-inline-purchase-validation.json
+          .venv/bin/python scripts/check_public_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate build/fast-variants/shopping-sessions_inline-purchase/shopping-sessions-dispatch \
+            --report logs/public-inline-purchase-validation.json
+      - name: Verify the screening winner on holdout and final-scale inputs
+        if: contains(github.event.head_commit.message, '[parser-sweep]')
+        run: |
+          .venv/bin/python - <<'PY'
+          import json, os, pathlib, shlex, subprocess, sys
+          sys.path.insert(0, 'scripts')
+          from benchmark_linux import run
+          report = json.loads(pathlib.Path('logs/linux-fast-parser-sweep.json').read_text())
+          if report['status'] != 'passed':
+              raise SystemExit('Screening must pass before selecting a candidate')
+          winner = min(report['variants'], key=lambda v: v['summary']['candidate']['container_seconds']['median'] / v['summary']['baseline']['container_seconds']['median'])
+          selection = {'label': winner['label'], 'settings': winner['settings'], 'image': winner['image'],
+                       'selection_method': 'Lowest median candidate/baseline ratio in the complete predeclared screening set; requires separate holdout confirmation',
+                       'screening_source': 'logs/linux-fast-parser-sweep.json'}
+          pathlib.Path('logs/fast-parser-selection.json').write_text(json.dumps(selection, indent=2) + '\n')
+          print('BEGIN_FAST_PARSER_SELECTION_JSON')
+          print(json.dumps(selection, indent=2))
+          print('END_FAST_PARSER_SELECTION_JSON', flush=True)
+          cid = run(['docker', 'create', winner['image']['id']], capture_output=True, text=True).stdout.strip()
+          binaries = pathlib.Path('build/parser-selected/bin').resolve()
+          binaries.mkdir(parents=True)
+          try:
+              run(['docker', 'cp', f'{cid}:/app/build/.', binaries])
+              commit = ['docker', 'commit', '--pause=false']
+              for key, value in winner['settings'].items():
+                  commit += ['--change', f'ENV {key}={value}']
+              run([*commit, cid, 'shopping-sessions:parser-selected'])
+          finally:
+              run(['docker', 'rm', cid])
+          fixture_env = dict(os.environ, IMAGE='shopping-sessions:parser-selected', CPUS='2', MEM='6g')
+          subprocess.run([sys.executable, 'scripts/run_fixtures.py', 'fixtures', '--', 'scripts/docker_run.sh'], env=fixture_env, check=True)
+          command = shlex.join(['env', *[f'{k}={v}' for k, v in winner['settings'].items()], str(binaries / 'shopping-sessions-dispatch')])
+          generator = 'build/fastpath-ci/generator-target/release/generate'
+          if winner['label'] != 'inline_purchase':
+              run([sys.executable, 'scripts/check_generator_fastpath.py', generator, '--candidate', command,
+                   '--baseline', 'build/fastpath-ci/bin/shopping-sessions', '--report', 'logs/generator-selected-parser-validation.json'])
+              run([sys.executable, 'scripts/check_public_fastpath.py', generator, '--candidate', command,
+                   '--report', 'logs/public-selected-parser-validation.json'])
+          benchmark = [sys.executable, 'scripts/benchmark_fastpath.py', '--image', 'shopping-sessions:parser-selected',
+                       '--baseline-image', 'shopping-sessions:original-fast', '--baseline-ref', os.environ['BASELINE_REF'],
+                       '--generator', generator, '--work', 'build/parser-selected/paired',
+                       '--case', '17:20000000:5', '--case', '8675309:20000000:5', '--case', '948307:60000000:3',
+                       '--report', 'logs/linux-selected-parser-paired.json']
+          for key, value in winner['settings'].items():
+              benchmark += ['--candidate-env', f'{key}={value}']
+          run(benchmark)
+          PY

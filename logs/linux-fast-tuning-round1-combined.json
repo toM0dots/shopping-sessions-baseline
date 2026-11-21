@@ -1,0 +1,661 @@
+{
+  "schema_version": 2,
+  "status": "passed",
+  "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+  "candidate_commit": "291a066f8f78b317bfe2351509bc64b97ded64b8",
+  "baseline_source_commit": "fd56b794f7efe74bcb4e8d32bd653f4df923c7fb",
+  "upstream_fastpath_commit": "92cf41220f5f8ee6d94822a43293699ba1286604",
+  "image": {
+    "reference": "shopping-sessions:ci",
+    "id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+    "os": "linux",
+    "architecture": "amd64",
+    "repo_digests": []
+  },
+  "images": {
+    "baseline": {
+      "reference": "shopping-sessions:original-fast",
+      "id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+      "os": "linux",
+      "architecture": "amd64",
+      "repo_digests": []
+    },
+    "candidate": {
+      "reference": "shopping-sessions:ci",
+      "id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+      "os": "linux",
+      "architecture": "amd64",
+      "repo_digests": []
+    }
+  },
+  "environments": {
+    "baseline": {
+      "SS_ENGINE": "fast",
+      "SS_ENGINE_TRACE": "1"
+    },
+    "candidate": {
+      "SS_ENGINE": "fast",
+      "SS_ENGINE_TRACE": "1",
+      "XL_CKIX": "1",
+      "XL_REL_BATCH": "8"
+    }
+  },
+  "generator_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/generator.zip",
+  "generator_sha256": "13724cadbac5a99d847e27cea911cd2e338ff972b46c2039da87452011bb101e",
+  "host_cpu_models": [
+    "AMD EPYC 9V45 96-Core Processor"
+  ],
+  "host_available_cpus": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "pinned_cpu_topology": [
+    {
+      "cpu": 0,
+      "physical_package_id": "0",
+      "core_id": "0",
+      "thread_siblings_list": "0-1"
+    },
+    {
+      "cpu": 1,
+      "physical_package_id": "0",
+      "core_id": "0",
+      "thread_siblings_list": "0-1"
+    },
+    {
+      "cpu": 2,
+      "physical_package_id": "0",
+      "core_id": "1",
+      "thread_siblings_list": "2-3"
+    },
+    {
+      "cpu": 3,
+      "physical_package_id": "0",
+      "core_id": "1",
+      "thread_siblings_list": "2-3"
+    }
+  ],
+  "host_memory_bytes": 16760344576,
+  "container_cpus": 4,
+  "container_cpuset": "0,1,2,3",
+  "container_memory": "12g",
+  "container_swap": "disabled",
+  "worker_threads": {
+    "baseline": 4,
+    "candidate": 4
+  },
+  "method": "Two immutable images; prior fast engine versus candidate fast engine; alternating AB/BA pairs; fresh containers and output directories; no discarded samples; caches not flushed",
+  "timing_scope": {
+    "container_seconds": "Docker FinishedAt minus StartedAt; includes startup and exit, excludes Docker create/client/inspection/removal. Daemon wall-clock timestamps; not the portal timer.",
+    "wall_seconds": "Host monotonic timer around output setup, Docker create/start/inspect/remove, permission cleanup, and scratch deletion; excludes output comparison."
+  },
+  "notes": "Generated-data CI comparison, not a hidden-data portal score. The supplied baseline image is identified by its immutable ID and declared source commit. Both images are required to finish on the fast path. CPU quota and cpuset stay fixed even when NCPU overrides vary worker counts. Peak RSS is not measured.",
+  "cases": [
+    {
+      "seed": 17,
+      "events": 20000000,
+      "clicks": 5000000,
+      "rounds": 3,
+      "input_csv_bytes": 1921192469,
+      "runs": [
+        {
+          "wall_seconds": 9.106374237000182,
+          "container_seconds": 0.254942805,
+          "container_started_at": "2026-11-21T22:15:28.588766613Z",
+          "container_finished_at": "2026-11-21T22:15:28.843709418Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5245666660000552,
+          "container_seconds": 0.262141688,
+          "container_started_at": "2026-11-21T22:15:29.120498539Z",
+          "container_finished_at": "2026-11-21T22:15:29.382640227Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.5389871180000227,
+          "container_seconds": 0.270229386,
+          "container_started_at": "2026-11-21T22:15:30.630843131Z",
+          "container_finished_at": "2026-11-21T22:15:30.901072517Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.5599770979999903,
+          "container_seconds": 0.265565106,
+          "container_started_at": "2026-11-21T22:15:31.162349987Z",
+          "container_finished_at": "2026-11-21T22:15:31.427915093Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5766643800000111,
+          "container_seconds": 0.27001204,
+          "container_started_at": "2026-11-21T22:15:32.725238463Z",
+          "container_finished_at": "2026-11-21T22:15:32.995250503Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5733954629999971,
+          "container_seconds": 0.281382836,
+          "container_started_at": "2026-11-21T22:15:33.300603013Z",
+          "container_finished_at": "2026-11-21T22:15:33.581985849Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "candidate"
+        }
+      ],
+      "comparisons": [
+        {
+          "round": 1,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        },
+        {
+          "round": 2,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        },
+        {
+          "round": 3,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "container_seconds": {
+            "min": 0.254942805,
+            "median": 0.265565106,
+            "max": 0.27001204
+          },
+          "wall_seconds": {
+            "min": 0.5599770979999903,
+            "median": 0.5766643800000111,
+            "max": 9.106374237000182
+          }
+        },
+        "candidate": {
+          "container_seconds": {
+            "min": 0.262141688,
+            "median": 0.270229386,
+            "max": 0.281382836
+          },
+          "wall_seconds": {
+            "min": 0.5245666660000552,
+            "median": 0.5389871180000227,
+            "max": 0.5733954629999971
+          }
+        }
+      },
+      "correctness": "Both complete tables match in all 3 pairs"
+    },
+    {
+      "seed": 8675309,
+      "events": 20000000,
+      "clicks": 5000000,
+      "rounds": 3,
+      "input_csv_bytes": 1898618584,
+      "runs": [
+        {
+          "wall_seconds": 8.037637711000116,
+          "container_seconds": 0.259254819,
+          "container_started_at": "2026-11-21T22:15:47.673114209Z",
+          "container_finished_at": "2026-11-21T22:15:47.932369028Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5234093869999015,
+          "container_seconds": 0.258177154,
+          "container_started_at": "2026-11-21T22:15:48.203923228Z",
+          "container_finished_at": "2026-11-21T22:15:48.462100382Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.5747555430000375,
+          "container_seconds": 0.283014196,
+          "container_started_at": "2026-11-21T22:15:49.551339431Z",
+          "container_finished_at": "2026-11-21T22:15:49.834353627Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.6021119090000866,
+          "container_seconds": 0.268063693,
+          "container_started_at": "2026-11-21T22:15:50.14338566Z",
+          "container_finished_at": "2026-11-21T22:15:50.411449353Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5707427889999508,
+          "container_seconds": 0.2617833,
+          "container_started_at": "2026-11-21T22:15:51.668106845Z",
+          "container_finished_at": "2026-11-21T22:15:51.929890145Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5471199109999816,
+          "container_seconds": 0.253597043,
+          "container_started_at": "2026-11-21T22:15:52.226597196Z",
+          "container_finished_at": "2026-11-21T22:15:52.480194239Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "candidate"
+        }
+      ],
+      "comparisons": [
+        {
+          "round": 1,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2231608 vs 2231608; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        },
+        {
+          "round": 2,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2231608 vs 2231608; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        },
+        {
+          "round": 3,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2231608 vs 2231608; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "container_seconds": {
+            "min": 0.259254819,
+            "median": 0.2617833,
+            "max": 0.268063693
+          },
+          "wall_seconds": {
+            "min": 0.5707427889999508,
+            "median": 0.6021119090000866,
+            "max": 8.037637711000116
+          }
+        },
+        "candidate": {
+          "container_seconds": {
+            "min": 0.253597043,
+            "median": 0.258177154,
+            "max": 0.283014196
+          },
+          "wall_seconds": {
+            "min": 0.5234093869999015,
+            "median": 0.5471199109999816,
+            "max": 0.5747555430000375
+          }
+        }
+      },
+      "correctness": "Both complete tables match in all 3 pairs"
+    },
+    {
+      "seed": 948307,
+      "events": 60000000,
+      "clicks": 15000000,
+      "rounds": 2,
+      "input_csv_bytes": 5630769996,
+      "runs": [
+        {
+          "wall_seconds": 6.523089215000027,
+          "container_seconds": 0.641812542,
+          "container_started_at": "2026-11-21T22:16:34.428623387Z",
+          "container_finished_at": "2026-11-21T22:16:35.070435929Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 1.1156642529999772,
+          "container_seconds": 0.639451234,
+          "container_started_at": "2026-11-21T22:16:35.537100113Z",
+          "container_finished_at": "2026-11-21T22:16:36.176551347Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 1.04847279899991,
+          "container_seconds": 0.6395664,
+          "container_started_at": "2026-11-21T22:16:39.10734091Z",
+          "container_finished_at": "2026-11-21T22:16:39.74690731Z",
+          "image_id": "sha256:67d112574fb4929048065183a41d706b4ec17beceddbaf6db8febe015460eb65",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1",
+            "XL_CKIX": "1",
+            "XL_REL_BATCH": "8"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 1.0705928869999752,
+          "container_seconds": 0.649007636,
+          "container_started_at": "2026-11-21T22:16:40.160442004Z",
+          "container_finished_at": "2026-11-21T22:16:40.80944964Z",
+          "image_id": "sha256:27990a046118c6e2713302ebf93d18216ae7d81ecc02bb9100cbae8eb0586c86",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "baseline"
+        }
+      ],
+      "comparisons": [
+        {
+          "round": 1,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 6601416 vs 6601416; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        },
+        {
+          "round": 2,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 6601416 vs 6601416; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH",
+          "stderr": ""
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "container_seconds": {
+            "min": 0.641812542,
+            "median": 0.6454100890000001,
+            "max": 0.649007636
+          },
+          "wall_seconds": {
+            "min": 1.0705928869999752,
+            "median": 3.7968410510000012,
+            "max": 6.523089215000027
+          }
+        },
+        "candidate": {
+          "container_seconds": {
+            "min": 0.639451234,
+            "median": 0.6395088170000001,
+            "max": 0.6395664
+          },
+          "wall_seconds": {
+            "min": 1.04847279899991,
+            "median": 1.0820685259999436,
+            "max": 1.1156642529999772
+          }
+        }
+      },
+      "correctness": "Both complete tables match in all 2 pairs"
+    }
+  ],
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44954335639",
+  "validated_source_commit": "291a066f8f78b317bfe2351509bc64b97ded64b8"
+}

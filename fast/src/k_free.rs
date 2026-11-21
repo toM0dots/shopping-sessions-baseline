@@ -1385,10 +1385,18 @@ unsafe fn ev_d<S: EventSink>(cx: &Cx<EvBatch, S>, p: *const u8, st: EvSt, np: *c
                 cold!();
             }
         }
-        if core::ptr::read_volatile((s as *const u8).add(PP + 7)) & 2 != 0
-            && kcall!(ev_purchase as unsafe extern "C" fn(_, _, _) -> u64, p as u64, np as u64, s as u64, 0u64).0 as u8 == 0
-        {
-            cold!();
+        if core::ptr::read_volatile((s as *const u8).add(PP + 7)) & 2 != 0 {
+            let parsed = if INLINE_PURCHASE {
+                // Event masks remain compiler-visible Rust values through the
+                // kreg operands in ev_masks/here_k. This inline leaf therefore
+                // preserves live masks without the external-call trampoline.
+                ev_purchase_inline(np, s)
+            } else {
+                kcall!(ev_purchase as unsafe extern "C" fn(_, _, _) -> u64, p as u64, np as u64, s as u64, 0u64).0
+            };
+            if parsed as u8 == 0 {
+                cold!();
+            }
         }
         *w = s.add(1);
         if (s.add(1) as usize) & (A - 1) == 0 {
@@ -1414,11 +1422,19 @@ unsafe fn ev_fast<S: EventSink, const TAIL: bool>(cx: &Cx<EvBatch, S>, p: *const
     }
 }
 
+const INLINE_PURCHASE: bool = crate::env_u32(option_env!("XL_INLINE_PURCHASE"), 0) != 0;
+
 #[cold]
 #[inline(never)]
-unsafe extern "C" fn ev_purchase(p: *const u8, np: *const u8, s: *mut i64) -> u64 {
+unsafe extern "C" fn ev_purchase(_p: *const u8, np: *const u8, s: *mut i64) -> u64 {
+    unsafe { ev_purchase_inline(np, s) }
+}
+
+// Called only after ev_s accepted the tail shape, so product + separator +
+// price occupy at most 31 bytes. Longer or malformed fields use ev_cold.
+#[inline(always)]
+unsafe fn ev_purchase_inline(np: *const u8, s: *mut i64) -> u64 {
     unsafe {
-        let _ = p;
         let pe = np.wrapping_sub(1);
         let pt = pe.wrapping_sub(32);
         let tw = _mm256_loadu_si256(pt as *const __m256i);
