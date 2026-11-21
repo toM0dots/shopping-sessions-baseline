@@ -515,23 +515,31 @@ template <class F> void parallel(size_t jobs, size_t threads, F f) {
     if (failure)
         std::rethrow_exception(failure);
 }
-static std::vector<SV> chunks(const std::vector<SV> &files) {
-    std::vector<SV> jobs;
-    for (SV text : files) {
-        auto p = text.find('\n');
-        if (p == SV::npos)
-            continue;
-        text.remove_prefix(p + 1);
-        while (!text.empty()) {
-            size_t n = std::min<size_t>(text.size(), 1 << 20);
-            if (n < text.size()) {
-                auto end = text.find('\n', n);
-                n = end == SV::npos ? text.size() : end + 1;
-            }
-            jobs.push_back(text.substr(0, n));
-            text.remove_prefix(n);
-        }
+// A nominal byte range of one input file. Boundaries are resolved by the
+// worker that parses it, so no input is touched serially beforehand (on cold
+// storage, each touch is a blocking read). A record belongs to the range that
+// holds its first byte; the header is the record at offset 0 and is skipped.
+struct Chunk {
+    SV file;
+    size_t begin, end;
+    SV resolve() const {
+        auto line_start = [&](size_t at) {
+            // The first record start at or after `at` (at > 0).
+            if (at >= file.size())
+                return file.size();
+            auto p = file.find('\n', at - 1);
+            return p == SV::npos ? file.size() : p + 1;
+        };
+        size_t first = line_start(begin ? begin : 1), last = line_start(end);
+        return first < last ? file.substr(first, last - first) : SV();
     }
+};
+static std::vector<Chunk> chunks(const std::vector<SV> &files) {
+    constexpr size_t size = 1 << 20;
+    std::vector<Chunk> jobs;
+    for (SV text : files)
+        for (size_t at = 0; at < text.size(); at += size)
+            jobs.push_back({text, at, std::min(text.size(), at + size)});
     return jobs;
 }
 // A person name together with its hash, so later phases never rehash cold input.
@@ -564,13 +572,13 @@ class Identity {
     static size_t index(uint64_t hash, size_t mask) { return (hash / SHARDS) & mask; }
 
   public:
-    void build(const std::vector<SV> &jobs, size_t threads) {
+    void build(const std::vector<Chunk> &jobs, size_t threads) {
         // Pass 1: parse each chunk and bucket its ID references by shard.
         std::vector<std::array<std::vector<Ref>, SHARDS>> refs(jobs.size());
         std::vector<uint32_t> pairs(jobs.size() + 1);
         parallel(jobs.size(), threads, [&](size_t job, size_t) {
             uint32_t n = 0;
-            fast_rows<2>(jobs[job], [&](auto &r) {
+            fast_rows<2>(jobs[job].resolve(), [&](auto &r) {
                 if (r[0].empty() || r[1].empty())
                     return;
                 for (int side = 0; side < 2; ++side) {
@@ -1046,7 +1054,7 @@ static int run() {
         std::vector<Partitions<RawEvent>> parsed(threads);
         parallel(event_jobs.size(), threads, [&](size_t job, size_t worker) {
             batched_rows<7>(
-                event_jobs[job],
+                event_jobs[job].resolve(),
                 [&](auto &r) {
                     uint64_t hash = Hash{}(r[1]);
                     people.prefetch(hash);
@@ -1105,7 +1113,7 @@ static int run() {
         std::vector<Partitions<Click>> parsed_clicks(threads);
         parallel(click_jobs.size(), threads, [&](size_t job, size_t worker) {
             batched_rows<4>(
-                click_jobs[job],
+                click_jobs[job].resolve(),
                 [&](auto &r) {
                     uint64_t hash = Hash{}(r[1]);
                     people.prefetch(hash);
