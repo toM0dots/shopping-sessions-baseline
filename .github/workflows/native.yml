@@ -49,6 +49,10 @@ jobs:
           git fetch --depth 1 origin a7cd5c1d43390cfb3960f2a11a9e13a5d44c8f9f
           .venv/bin/python scripts/check_parser_semantics.py
           .venv/bin/python scripts/check_parser_semantics.py --scalar
+      - name: Check compact key semantics and memory boundaries
+        run: |
+          .venv/bin/python scripts/check_keys.py
+          .venv/bin/python scripts/check_keys.py --scalar
       - name: Build Linux image
         run: docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
       - name: Run all fixtures with scorer isolation flags

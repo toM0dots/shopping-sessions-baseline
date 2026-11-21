@@ -129,14 +129,15 @@ static FallbackIds fallback_ids;
 
 // An ID in 8 bytes. Every generated ID is one byte followed by 1 to 8
 // characters of [0-9a-z] (u..., e..., k...); such an ID is packed exactly:
-// bit 63 set, the first byte in bits 45-52, the digit count minus one in bits
-// 42-44 and the base-36 value in bits 0-41. Equality is one integer compare.
+// bit 63 set, the first byte in bits 51-58, the digit count minus one in bits
+// 48-50 and up to eight six-bit digits in bits 0-47. Equality is one integer
+// compare. Six-bit digits preserve all leading zeroes through the stored length.
 // Any other ID is a pointer to a length-prefixed copy (bit 63 clear). A string
 // either always packs or never does, so a packed key never equals a copied one.
 // Zero is the empty key: no stored ID is empty.
 struct Key {
     uint64_t v = 0;
-    static constexpr uint64_t PACKED = uint64_t(1) << 63, VALUE = (uint64_t(1) << 42) - 1;
+    static constexpr uint64_t PACKED = uint64_t(1) << 63, VALUE = (uint64_t(1) << 48) - 1;
     static const std::array<uint8_t, 256> &digits() {
         static const std::array<uint8_t, 256> table = [] {
             std::array<uint8_t, 256> t{};
@@ -153,8 +154,8 @@ struct Key {
 #if defined(__SSE2__)
         if (s.size() == 9) {
             // Eight digits, the common case: validate and convert them in one
-            // register, then combine pairs, quads and halves with three
-            // multiplies. Byte 0 is the most significant digit.
+            // register, then compact pairs, quads and halves with shifts.
+            // Byte 0 is the most significant six-bit digit.
             uint64_t raw;
             std::memcpy(&raw, s.data() + 1, 8);
             __m128i c = _mm_cvtsi64_si128(int64_t(raw));
@@ -166,10 +167,10 @@ struct Key {
                 __m128i d = _mm_sub_epi8(_mm_sub_epi8(c, _mm_set1_epi8('0')),
                                          _mm_and_si128(alpha, _mm_set1_epi8('a' - '0' - 10)));
                 uint64_t lanes = uint64_t(_mm_cvtsi128_si64(d));
-                lanes = (lanes & 0x00FF00FF00FF00FFULL) * 36 + ((lanes >> 8) & 0x00FF00FF00FF00FFULL);
-                lanes = (lanes & 0x0000FFFF0000FFFFULL) * 1296 + ((lanes >> 16) & 0x0000FFFF0000FFFFULL);
-                uint64_t value = (lanes & 0xFFFFFFFFULL) * 1679616 + (lanes >> 32);
-                return Key{PACKED | uint64_t(uint8_t(s[0])) << 45 | uint64_t(7) << 42 | value};
+                lanes = ((lanes & 0x00FF00FF00FF00FFULL) << 6) | ((lanes >> 8) & 0x00FF00FF00FF00FFULL);
+                lanes = ((lanes & 0x0000FFFF0000FFFFULL) << 12) | ((lanes >> 16) & 0x0000FFFF0000FFFFULL);
+                uint64_t value = ((lanes & 0xFFFFFFFFULL) << 24) | (lanes >> 32);
+                return Key{PACKED | uint64_t(uint8_t(s[0])) << 51 | uint64_t(7) << 48 | value};
             }
             return Key{reinterpret_cast<uintptr_t>(fallback_ids.copy(s))};
         }
@@ -181,10 +182,10 @@ struct Key {
             for (size_t i = 1; i < s.size(); ++i) {
                 uint8_t digit = d[uint8_t(s[i])];
                 packable &= digit != 0xFF;
-                value = value * 36 + (digit & 63);
+                value = (value << 6) | (digit & 63);
             }
             if (packable)
-                return Key{PACKED | uint64_t(uint8_t(s[0])) << 45 | uint64_t(s.size() - 2) << 42 | value};
+                return Key{PACKED | uint64_t(uint8_t(s[0])) << 51 | uint64_t(s.size() - 2) << 48 | value};
         }
         return Key{reinterpret_cast<uintptr_t>(fallback_ids.copy(s))};
     }
@@ -195,18 +196,19 @@ struct Key {
         if (!packed())
             return v ? FallbackIds::text(reinterpret_cast<const char *>(uintptr_t(v))) : SV();
         static const char alphabet[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-        size_t count = ((v >> 42) & 7) + 1;
+        size_t count = ((v >> 48) & 7) + 1;
         uint64_t value = v & VALUE;
-        buf[0] = char((v >> 45) & 0xFF);
+        buf[0] = char((v >> 51) & 0xFF);
         for (size_t i = count; i > 0; --i) {
-            buf[i] = alphabet[value % 36];
-            value /= 36;
+            buf[i] = alphabet[value & 63];
+            value >>= 6;
         }
         return SV(buf, count + 1);
     }
     size_t size() const {
-        char buf[16];
-        return text(buf).size();
+        if (packed())
+            return ((v >> 48) & 7) + 2;
+        return v ? FallbackIds::text(reinterpret_cast<const char *>(uintptr_t(v))).size() : 0;
     }
     bool operator==(const Key &o) const {
         if (v == o.v)
@@ -218,7 +220,7 @@ struct Key {
     }
     bool operator!=(const Key &o) const { return !(*this == o); }
     // Byte-wise order. Packed keys compare by first byte, then by the digits
-    // left-aligned to eight places (base-36 digits sort like their ASCII
+    // left-aligned to eight places (digit values sort like their ASCII
     // bytes), then by length, so a prefix sorts first.
     bool operator<(const Key &o) const {
         if (packed() && o.packed())
@@ -227,10 +229,9 @@ struct Key {
         return text(a) < o.text(b);
     }
     static uint64_t order(uint64_t v) {
-        static const uint64_t scale[9] = {1, 36, 1296, 46656, 1679616, 60466176, 2176782336ULL,
-                                          78364164096ULL, 2821109907456ULL};
-        uint64_t count = ((v >> 42) & 7) + 1;
-        return ((v >> 45) & 0xFF) << 48 | ((v & VALUE) * scale[8 - count]) << 3 | (count - 1);
+        uint64_t count = ((v >> 48) & 7) + 1;
+        uint64_t aligned = (v & VALUE) << (6 * (8 - count));
+        return ((v >> 51) & 0xFF) << 51 | (aligned << 3) | (count - 1);
     }
     uint64_t hash() const {
         if (!packed()) {
@@ -1337,11 +1338,16 @@ static void write_users(const fs::path &path,
     arrow::StringBuilder user, category;
     arrow::Date32Builder day;
     arrow::Int64Builder sessions, events, revenue;
-    size_t n = last - first, bytes = 0;
-    each_row(results, first, last, [&](const UserRow &r) { bytes += r.person.size(); });
+    size_t n = last - first, bytes = 0, category_bytes = 0;
+    each_row(results, first, last, [&](const UserRow &r) {
+        bytes += r.person.size();
+        if (r.category >= 0)
+            category_bytes += categories[r.category].size();
+    });
     check(user.Reserve(n));
     check(user.ReserveData(bytes));
     check(category.Reserve(n));
+    check(category.ReserveData(category_bytes));
     check(day.Reserve(n));
     check(sessions.Reserve(n));
     check(events.Reserve(n));
@@ -1349,16 +1355,17 @@ static void write_users(const fs::path &path,
     each_row(results, first, last, [&](const UserRow &r) {
             char buf[16];
             SV name = r.person.text(buf);
-            check(user.Append(name.data(), name.size()));
+            // Both element and byte capacities were checked above.
+            user.UnsafeAppend(name);
             day.UnsafeAppend(r.day);
             sessions.UnsafeAppend(r.sessions);
             events.UnsafeAppend(r.events);
             revenue.UnsafeAppend(r.revenue);
             if (r.category < 0)
-                check(category.AppendNull());
+                category.UnsafeAppendNull();
             else {
                 auto c = categories[r.category];
-                check(category.Append(c.data(), c.size()));
+                category.UnsafeAppend(c);
             }
         });
     auto schema = arrow::schema(
@@ -1540,30 +1547,53 @@ static int run() {
                 if (r->event)
                     r->event->user = Key{};
             };
-            std::vector<Ref> table;
-            for (auto &b : buckets) {
-                size_t cap = 16;
-                while (cap * 2 / 3 < b.size())
-                    cap *= 2;
-                table.assign(cap, Ref{0, nullptr});
-                size_t mask = cap - 1;
-                // Insertion order matches the previous single table: workers,
-                // then each worker's rows in order; ties keep the first seen.
-                for (auto &x : b) {
-                    size_t i = (x.hash >> 12) & mask;
-                    while (table[i].rec && (table[i].hash != x.hash || table[i].rec->id != x.rec->id))
-                        i = (i + 1) & mask;
-                    auto &old = table[i];
-                    if (!old.rec)
-                        old = x;
-                    else if (x.rec->ingest < old.rec->ingest) {
-                        drop(old.rec);
-                        old = x;
-                    } else
-                        drop(x.rec);
+            // Fingerprints reject unrelated keys before following a record
+            // pointer. Store the winner's bucket index instead of its pointer,
+            // halving normal table slots to eight bytes. A full Key comparison
+            // still resolves fingerprint collisions; no ID bits are discarded.
+            auto deduplicate = [&](auto index_type) {
+                using Index = decltype(index_type);
+                struct Slot {
+                    uint32_t tag = 0;
+                    Index winner = 0; // bucket index + 1; zero means unoccupied
+                };
+                std::vector<Slot> table;
+                for (auto &b : buckets) {
+                    size_t cap = 16;
+                    while (cap * 2 / 3 < b.size())
+                        cap *= 2;
+                    table.assign(cap, Slot{});
+                    size_t mask = cap - 1;
+                    // Insertion order matches the previous single table: workers,
+                    // then each worker's rows in order; ties keep the first seen.
+                    for (size_t next = 0; next < b.size(); ++next) {
+                        const auto &x = b[next];
+                        uint32_t tag = uint32_t(x.hash >> 32);
+                        size_t i = (x.hash >> 12) & mask;
+                        while (table[i].winner &&
+                               (table[i].tag != tag || b[table[i].winner - 1].rec->id != x.rec->id))
+                            i = (i + 1) & mask;
+                        auto &old = table[i];
+                        if (!old.winner)
+                            old = {tag, Index(next + 1)};
+                        else {
+                            const DedupRec *previous = b[old.winner - 1].rec;
+                            if (x.rec->ingest < previous->ingest) {
+                                drop(previous);
+                                old.winner = Index(next + 1);
+                            } else
+                                drop(x.rec);
+                        }
+                    }
+                    std::vector<Ref>().swap(b);
                 }
-                std::vector<Ref>().swap(b);
-            }
+            };
+            // The compact path imposes no new input-size limit: choose a wider
+            // index if this shard could exceed the 32-bit representation.
+            if (count <= std::numeric_limits<uint32_t>::max())
+                deduplicate(uint32_t{});
+            else
+                deduplicate(size_t{});
             for (auto &p : event_ids)
                 p[shard].release();
         });
@@ -1645,18 +1675,48 @@ static int run() {
         for (size_t i = 0; i < threads; ++i)
             campaign_rows.emplace_back(campaigns.size(), floor_day(lo),
                                        floor_day(hi - 1) - floor_day(lo) + 1, threads);
+        struct PersonEvent {
+            uint32_t person;
+            CompactEvent event;
+        };
+        struct PersonClick {
+            uint32_t person;
+            CompactClick click;
+        };
+        // Each worker owns its buffers across pieces. Local references below
+        // avoid repeated thread-local address lookups inside row callbacks.
+        // Align metadata so workers updating vector sizes do not share a line.
+        struct alignas(64) AggregateScratch {
+            std::vector<PersonEvent> gathered, event_scratch;
+            std::vector<PersonClick> gathered_clicks, click_scratch;
+            std::vector<uint32_t> event_start, click_start, fill;
+            std::unique_ptr<CompactEvent[]> events;
+            std::unique_ptr<CompactClick[]> clicks;
+            size_t event_capacity = 0, click_capacity = 0;
+            std::vector<I64> category_revenue;
+            std::vector<uint32_t> active_counts, positions, active, touched;
+        };
+        std::vector<AggregateScratch> aggregate_scratch(threads);
         parallel(SHARDS * PIECES, threads, [&](size_t job, size_t worker) {
+            auto &scratch = aggregate_scratch[worker];
+            auto &gathered = scratch.gathered;
+            auto &event_scratch = scratch.event_scratch;
+            auto &gathered_clicks = scratch.gathered_clicks;
+            auto &click_scratch = scratch.click_scratch;
+            auto &event_start = scratch.event_start;
+            auto &click_start = scratch.click_start;
+            auto &fill = scratch.fill;
+            auto &events = scratch.events;
+            auto &clicks = scratch.clicks;
+            auto &event_capacity = scratch.event_capacity;
+            auto &click_capacity = scratch.click_capacity;
             auto &piece_e = piece_events[job / PIECES][job % PIECES];
             auto &piece_c = piece_clicks[job / PIECES][job % PIECES];
             // Intern persons, then group each person's records contiguously with
             // a counting sort; only the per-person runs are sorted by time.
             constexpr uint32_t NONE = UINT32_MAX;
             PersonTable people_here(piece_e.size() / 8 + 16);
-            struct PersonEvent {
-                uint32_t person;
-                CompactEvent event;
-            };
-            std::vector<PersonEvent> gathered;
+            gathered.clear();
             gathered.reserve(piece_e.size());
             piece_e.each([&](const PieceEvent &e) {
                 CompactEvent ce{lo + I64(e.when), 0, 0};
@@ -1669,30 +1729,31 @@ static int run() {
             piece_e.release();
             // Radix-sort the piece by time; the stable counting sort by person
             // below then leaves every person's events in time order.
-            {
-                std::vector<PersonEvent> scratch;
-                radix_sort(gathered, scratch, uint64_t(hi - 1 - lo),
-                           [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo); });
-            }
+            event_scratch.reserve(gathered.size());
+            radix_sort(gathered, event_scratch, uint64_t(hi - 1 - lo),
+                       [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo); });
             size_t np = people_here.size();
-            std::vector<uint32_t> event_start(np + 1), click_start(np + 1);
+            // Reserve the input-derived size before resizing, so these buffers
+            // need not grow geometrically beyond the largest observed piece.
+            event_start.reserve(np + 1);
+            click_start.reserve(np + 1);
+            fill.reserve(np);
+            event_start.assign(np + 1, 0);
+            click_start.assign(np + 1, 0);
             for (auto &g : gathered)
                 ++event_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 event_start[p + 1] += event_start[p];
             // Every slot is written by the counting sort below: no zero fill.
-            std::unique_ptr<CompactEvent[]> events(new CompactEvent[gathered.size()]);
-            {
-                std::vector<uint32_t> fill(event_start.begin(), event_start.end() - 1);
-                for (auto &g : gathered)
-                    events[fill[g.person]++] = g.event;
+            if (gathered.size() > event_capacity) {
+                event_capacity = gathered.size();
+                events.reset(new CompactEvent[event_capacity]);
             }
-            std::vector<PersonEvent>().swap(gathered);
-            struct PersonClick {
-                uint32_t person;
-                CompactClick click;
-            };
-            std::vector<PersonClick> gathered_clicks;
+            fill.assign(event_start.begin(), event_start.end() - 1);
+            for (auto &g : gathered)
+                events[fill[g.person]++] = g.event;
+            gathered.clear();
+            gathered_clicks.clear();
             gathered_clicks.reserve(piece_c.size());
             piece_c.each([&](const PieceClick &c) {
                 auto p = people_here.find({c.person, c.person.hash()});
@@ -1700,22 +1761,21 @@ static int run() {
                     gathered_clicks.push_back({p, {c.id, c.ts, c.campaign}});
             });
             piece_c.release();
-            {
-                std::vector<PersonClick> scratch;
-                radix_sort(gathered_clicks, scratch, uint64_t(hi - 1 - (lo - REACH)),
-                           [&](const PersonClick &g) { return uint64_t(g.click.ts - (lo - REACH)); });
-            }
+            click_scratch.reserve(gathered_clicks.size());
+            radix_sort(gathered_clicks, click_scratch, uint64_t(hi - 1 - (lo - REACH)),
+                       [&](const PersonClick &g) { return uint64_t(g.click.ts - (lo - REACH)); });
             for (auto &g : gathered_clicks)
                 ++click_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 click_start[p + 1] += click_start[p];
-            std::unique_ptr<CompactClick[]> clicks(new CompactClick[gathered_clicks.size()]);
-            {
-                std::vector<uint32_t> fill(click_start.begin(), click_start.end() - 1);
-                for (auto &g : gathered_clicks)
-                    clicks[fill[g.person]++] = g.click;
+            if (gathered_clicks.size() > click_capacity) {
+                click_capacity = gathered_clicks.size();
+                clicks.reset(new CompactClick[click_capacity]);
             }
-            std::vector<PersonClick>().swap(gathered_clicks);
+            fill.assign(click_start.begin(), click_start.end() - 1);
+            for (auto &g : gathered_clicks)
+                clicks[fill[g.person]++] = g.click;
+            gathered_clicks.clear();
             // A person's clicks at the same millisecond: the smallest ID must come
             // last. Tie groups never cross into the next person's range.
             for (size_t p = 0; p < np; ++p) {
@@ -1732,10 +1792,13 @@ static int run() {
             }
             auto &rows = user_rows[worker];
             auto &daily = campaign_rows[worker];
-            // Per-thread scratch, reused across this thread's pieces. Category
-            // totals are all zero between user-days; only touched ones are reset.
-            static thread_local std::vector<I64> category_revenue;
-            static thread_local std::vector<uint32_t> active_counts, positions, active, touched;
+            // Category totals are zero between user-days; only touched ones
+            // are reset. Campaign counters are reset before the next person.
+            auto &category_revenue = scratch.category_revenue;
+            auto &active_counts = scratch.active_counts;
+            auto &positions = scratch.positions;
+            auto &active = scratch.active;
+            auto &touched = scratch.touched;
             if (category_revenue.size() != categories.size())
                 category_revenue.assign(categories.size(), 0);
             if (active_counts.size() != campaigns.size()) {
@@ -1810,6 +1873,9 @@ static int run() {
                 }
             }
         });
+        // Release even the largest piece buffers before allocating Parquet
+        // columns. This cleanup remains inside the aggregation phase timer.
+        aggregate_scratch.clear();
         timing("sessionize_aggregate");
         CampaignDaily daily;
         for (auto &part : campaign_rows)
