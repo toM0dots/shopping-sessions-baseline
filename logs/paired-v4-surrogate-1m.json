@@ -1,0 +1,187 @@
+{
+  "platform": "Linux-6.18.44-fc-v726-x86_64-with-glibc2.39",
+  "data": "surrogate/s1m",
+  "threads": 4,
+  "commands": {
+    "baseline": "build/main-b617b8a",
+    "candidate": "build/shopping-sessions"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 10 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 0.24065165800004706,
+      "median_seconds": 0.25570488099998556,
+      "max_seconds": 0.28896438999998963,
+      "peak_rss_bytes": 261615616
+    },
+    "candidate": {
+      "min_seconds": 0.19644086099998503,
+      "median_seconds": 0.2083776704999991,
+      "max_seconds": 0.2236647420000395,
+      "peak_rss_bytes": 290185216
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 0.2540579679999837,
+      "peak_rss_bytes": 259338240,
+      "exit_code": 0,
+      "stderr": "setup=0.0132894 parse_events=0.0635009 dedup_events=0.0370516 clicks=0.0241085 sessionize_aggregate=0.0493694 write_parquet=0.044547 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.232681}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 0.20600433900000326,
+      "peak_rss_bytes": 278659072,
+      "exit_code": 0,
+      "stderr": "setup=0.0131879 parse_events=0.0449712 dedup_events=0.0262468 clicks=0.0215416 sessionize_aggregate=0.0339191 write_parquet=0.0440046 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.18452}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 0.21536727000000155,
+      "peak_rss_bytes": 279842816,
+      "exit_code": 0,
+      "stderr": "setup=0.0182218 parse_events=0.0500603 dedup_events=0.0207955 clicks=0.0219223 sessionize_aggregate=0.033767 write_parquet=0.0447922 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.190208}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 0.244740371999967,
+      "peak_rss_bytes": 249327616,
+      "exit_code": 0,
+      "stderr": "setup=0.0132897 parse_events=0.0627355 dedup_events=0.0333941 clicks=0.022854 sessionize_aggregate=0.0487908 write_parquet=0.0425219 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.224338}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 0.2445073459999776,
+      "peak_rss_bytes": 250974208,
+      "exit_code": 0,
+      "stderr": "setup=0.0123291 parse_events=0.0592701 dedup_events=0.0330284 clicks=0.0224939 sessionize_aggregate=0.049241 write_parquet=0.0451656 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.222458}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 0.2236647420000395,
+      "peak_rss_bytes": 280735744,
+      "exit_code": 0,
+      "stderr": "setup=0.0141566 parse_events=0.0610623 dedup_events=0.0246064 clicks=0.0219143 sessionize_aggregate=0.0329194 write_parquet=0.042674 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.198046}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 0.21706977100001268,
+      "peak_rss_bytes": 284651520,
+      "exit_code": 0,
+      "stderr": "setup=0.0180676 parse_events=0.0522249 dedup_events=0.0217602 clicks=0.0205324 sessionize_aggregate=0.0348142 write_parquet=0.0460053 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.19412}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 0.28896438999998963,
+      "peak_rss_bytes": 259375104,
+      "exit_code": 0,
+      "stderr": "setup=0.0165104 parse_events=0.0703748 dedup_events=0.0387568 clicks=0.0251912 sessionize_aggregate=0.0597128 write_parquet=0.0522138 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.263556}"
+    },
+    {
+      "round": 5,
+      "implementation": "baseline",
+      "wall_seconds": 0.25484411799999407,
+      "peak_rss_bytes": 257159168,
+      "exit_code": 0,
+      "stderr": "setup=0.0145797 parse_events=0.057773 dedup_events=0.0378373 clicks=0.0248238 sessionize_aggregate=0.052652 write_parquet=0.0449515 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.233461}"
+    },
+    {
+      "round": 5,
+      "implementation": "candidate",
+      "wall_seconds": 0.20158264000002646,
+      "peak_rss_bytes": 274874368,
+      "exit_code": 0,
+      "stderr": "setup=0.014198 parse_events=0.0454478 dedup_events=0.0196146 clicks=0.0207826 sessionize_aggregate=0.0344627 write_parquet=0.0450506 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.180384}"
+    },
+    {
+      "round": 6,
+      "implementation": "candidate",
+      "wall_seconds": 0.19644086099998503,
+      "peak_rss_bytes": 274911232,
+      "exit_code": 0,
+      "stderr": "setup=0.0137443 parse_events=0.0450778 dedup_events=0.0195127 clicks=0.0203526 sessionize_aggregate=0.0342369 write_parquet=0.0404613 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.174092}"
+    },
+    {
+      "round": 6,
+      "implementation": "baseline",
+      "wall_seconds": 0.28106404399994744,
+      "peak_rss_bytes": 252055552,
+      "exit_code": 0,
+      "stderr": "setup=0.013042 parse_events=0.0605961 dedup_events=0.0363998 clicks=0.0344171 sessionize_aggregate=0.0615559 write_parquet=0.0515951 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.25837}"
+    },
+    {
+      "round": 7,
+      "implementation": "baseline",
+      "wall_seconds": 0.25656564399997706,
+      "peak_rss_bytes": 260370432,
+      "exit_code": 0,
+      "stderr": "setup=0.0124431 parse_events=0.0670444 dedup_events=0.0342594 clicks=0.0241846 sessionize_aggregate=0.0502204 write_parquet=0.045428 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.2344}"
+    },
+    {
+      "round": 7,
+      "implementation": "candidate",
+      "wall_seconds": 0.20099481699998023,
+      "peak_rss_bytes": 282791936,
+      "exit_code": 0,
+      "stderr": "setup=0.0144857 parse_events=0.0469145 dedup_events=0.0205143 clicks=0.0201539 sessionize_aggregate=0.0327669 write_parquet=0.0441233 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.17969}"
+    },
+    {
+      "round": 8,
+      "implementation": "candidate",
+      "wall_seconds": 0.21149956799996517,
+      "peak_rss_bytes": 285241344,
+      "exit_code": 0,
+      "stderr": "setup=0.0136041 parse_events=0.045554 dedup_events=0.0213642 clicks=0.0217304 sessionize_aggregate=0.034031 write_parquet=0.0443168 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.181309}"
+    },
+    {
+      "round": 8,
+      "implementation": "baseline",
+      "wall_seconds": 0.24065165800004706,
+      "peak_rss_bytes": 261615616,
+      "exit_code": 0,
+      "stderr": "setup=0.0128681 parse_events=0.0566883 dedup_events=0.0315914 clicks=0.0221658 sessionize_aggregate=0.0506637 write_parquet=0.0429275 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.217748}"
+    },
+    {
+      "round": 9,
+      "implementation": "baseline",
+      "wall_seconds": 0.2657669150000288,
+      "peak_rss_bytes": 260517888,
+      "exit_code": 0,
+      "stderr": "setup=0.0126945 parse_events=0.0683696 dedup_events=0.0376409 clicks=0.028236 sessionize_aggregate=0.0512234 write_parquet=0.0452337 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.244205}"
+    },
+    {
+      "round": 9,
+      "implementation": "candidate",
+      "wall_seconds": 0.21075100199999497,
+      "peak_rss_bytes": 282382336,
+      "exit_code": 0,
+      "stderr": "setup=0.0142671 parse_events=0.0456417 dedup_events=0.0194978 clicks=0.0282746 sessionize_aggregate=0.0330815 write_parquet=0.0457843 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.187293}"
+    },
+    {
+      "round": 10,
+      "implementation": "candidate",
+      "wall_seconds": 0.2003923630000486,
+      "peak_rss_bytes": 290185216,
+      "exit_code": 0,
+      "stderr": "setup=0.0141868 parse_events=0.0445565 dedup_events=0.0196598 clicks=0.020211 sessionize_aggregate=0.0330825 write_parquet=0.0432845 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.175704}"
+    },
+    {
+      "round": 10,
+      "implementation": "baseline",
+      "wall_seconds": 0.25721246500000916,
+      "peak_rss_bytes": 261554176,
+      "exit_code": 0,
+      "stderr": "setup=0.0124296 parse_events=0.0619795 dedup_events=0.0330175 clicks=0.0229387 sessionize_aggregate=0.0555526 write_parquet=0.0499329 \n{\"user_rows\":132965,\"campaign_rows\":28013,\"sessions\":184516,\"events\":983055,\"revenue_cents\":2468347643,\"elapsed_seconds\":0.236651}"
+    }
+  ]
+}

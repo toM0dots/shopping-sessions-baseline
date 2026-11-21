@@ -6,34 +6,36 @@ The default runner executes the compiled native pipeline and writes both Parquet
 
 ## Latest update: parallel identity and leaner partitions
 
-Fresh-process paired runs against the previous native build (`a7cd5c1`), alternating order,
-`NCPU=4`. Both complete tables matched in every round:
+Fresh-process paired runs against the previous `main` (`b617b8a`), alternating order, `NCPU=4`.
+Both complete tables matched in every round:
 
 | Input (surrogate) | Rounds | Previous median | Updated median | Runtime reduction |
 | --- | ---: | ---: | ---: | ---: |
-| 1M events / 250K clicks / 12.5K links | 10 | 0.294 s | **0.214 s** | **27%** |
-| 20M events / 5M clicks / 250K links | 6 | 7.075 s | **3.328 s** | **53%** |
-| 20M events / 5M clicks / 2M links | 6 | 11.088 s | **3.886 s** | **65%** |
+| 1M events / 250K clicks / 12.5K links | 10 | 0.256 s | **0.208 s** | **19%** |
+| 20M events / 5M clicks / 250K links | 6 | 6.042 s | **3.022 s** | **50%** |
+| 20M events / 5M clicks / 2M links | 6 | 7.488 s | **3.584 s** | **52%** |
 
 Measured in a Linux x86-64 cloud container, 4 vCPUs, 15 GiB RAM, against Arrow from the PyArrow
 19.0.1 wheel (`make native-wheel`). The official generator was not reachable from that
 environment, so these inputs come from `scripts/surrogate_gen.cpp`. It reproduces the file formats,
 duplicate and malformed rows, mixed timestamp formats and linked device IDs. It is **not** the
-official generator, and absolute times are not comparable with the macOS figures below. The
-link-heavy row matters because the previous version resolved links on one thread: there,
-setup alone took 4.3 s. Peak RSS was 4.58 GiB versus 4.14 GiB on the 250K-link input and 4.72
-versus 4.89 GiB on the 2M-link input. Reports: `logs/paired-v3-surrogate-*.json`.
+official generator, and absolute times are not comparable with the figures below. Peak RSS was
+4.39 GiB versus 4.58 GiB on the 250K-link input and 4.68 versus 4.75 GiB on the 2M-link input.
+Reports: `logs/paired-v4-surrogate-*.json`.
 
-What changed, by phase (20M, 250K links, single runs):
+What changed, by phase (20M, 250K links, first paired round):
 
 | Phase | Previous | Updated | Change |
 | --- | ---: | ---: | --- |
-| setup (links) | 0.34 s | 0.08 s | Parallel hash-sharded interning, integer union-find, concurrent naming |
-| parse_events | 1.80 s | 1.05 s | One-pass SSE2 splitter, append-only block buffers, batched lookup prefetch |
-| dedup_events | 0.92 s | 0.45 s | Person hashes computed once at parse time; prefetched probes |
-| clicks | 0.72 s | 0.56 s | Cached click-ID hashes; same buffers and prefetch |
-| sessionize_aggregate | 2.31 s | 0.67 s | Shard-local open addressing plus counting sort, not hash map plus full sort |
-| write_parquet | 0.94 s | 0.27 s | Large `user_daily` tables are written as concurrently encoded part files |
+| setup (links) | 0.20 s | 0.07 s | Parallel hash-sharded interning, integer union-find, concurrent naming |
+| parse_events | 1.52 s | 0.95 s | Per-chunk SSE2 splitter, append-only block buffers, batched lookup prefetch |
+| dedup_events | 0.97 s | 0.46 s | Person hashes computed once at parse time; prefetched probes |
+| clicks | 0.76 s | 0.50 s | Cached click-ID hashes; same buffers and prefetch |
+| sessionize_aggregate | 1.72 s | 0.63 s | Grouping uses cached hashes and shard-local tables, never rehashing input |
+| write_parquet | 0.79 s | 0.24 s | Large `user_daily` tables are written as concurrently encoded part files |
+
+The validated date-prefix cache in `timestamp()` and the SSE2 `rows()` scanner from
+`af0ae36` are retained. `rows()` still parses lookups and any line that contains a quote.
 
 Large `user_daily` outputs, at least 262,144 rows per part, are written as up to `NCPU` files,
 `part-0.parquet` … `part-N.parquet`, in the same directory. The unmodified official checker
@@ -43,140 +45,119 @@ outputs, including all fixtures and the public 1M answer, stay a single `part-0.
 Validation of this update:
 
 - 36/36 official fixtures pass, with the SSE2 splitter and with the portable scalar fallback.
-- All three surrogate inputs match the previous build exactly. The 1M surrogate also matches the
+- All three surrogate inputs match the previous `main` exactly. The 1M surrogate also matches the
   Python reference.
 - `scripts/fuzz_reference.py` checks 150 adversarial small inputs against the Python reference
   at `NCPU=1` and `NCPU=3` with no differences. The inputs include quotes, CRs, missing final LFs,
   malformed rows, self and chained links, duplicates and boundary timestamps.
-- The static-Arrow Linux container build could not be run in that environment, because
-  GitHub archive downloads were blocked. The `native.yml` workflow covers it on push.
+- `scripts/check_parser_semantics.py` passes, SIMD and scalar: 361,548 CSV and 203,052 timestamp
+  comparisons.
+- The static-Arrow container build and all fixtures pass in the `native.yml` workflow.
 - The public 1M answer, the hidden portal input and the 60M workload were not available
   for this update.
 
-## Runtime and correctness (previous update)
+## Runtime and measurement context
 
-The portal practice workload uses **about 20M events, 8 vCPUs and 24 GB RAM**,
-timed from container start to exit; the public 1M input is the correctness gate.
-The final workload is about 60M events. See the
-[official scoring configuration](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions).
-The reported **7.3-second portal score** is therefore different from the earlier
-local subsecond result. This update has not yet been scored on the portal.
+The [portal practice workload](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions)
+uses **about 20M hidden events, 8 vCPUs and 24 GB RAM**, timed from container start
+through exit. Its final workload is about 60M events. The public 1M input is a
+smaller correctness check. The last reported **7.3-second portal result is not a
+measurement of this revision**; a new portal run is still needed.
 
-Fresh-process comparisons against the published `c697d57` native implementation:
+The latest **Linux container comparison** against `a7cd5c1` measured
+**7.285 → 5.993 s median on generated 20M events / 5M clicks: 17.7% lower runtime**.
+The candidate was faster in all six alternating pairs, and both complete output
+tables matched in every pair. This ran on a GitHub Linux runner with **4 vCPUs
+and a 12 GiB container limit**. Timing includes Docker client startup and cleanup;
+it is separate from the portal's 7.3 s result and its 8-vCPU environment.
 
-| Input | Paired rounds | Previous median | Updated median | Runtime reduction |
+Candidate runs ranged from 5.971–7.146 s; baseline runs from 7.191–16.257 s.
+The slower first baseline invocation is retained. All samples and provenance are
+in `logs/linux-v3-final-20m.json`; the
+[successful workflow](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821)
+also verifies the Linux build, sanitizer checks and all 36 fixtures.
+
+The latest local comparisons use the immediately previous published version,
+`a7cd5c1`, as baseline. Each round alternates execution order and compares both
+complete output tables after timing:
+
+| Local input | Paired rounds | Previous median | Updated median | Runtime reduction |
 | --- | ---: | ---: | ---: | ---: |
-| Public 1M events / 250K clicks | 10 | 0.911 s | **0.593 s** | **34.9%** |
-| Generated 20M events / 5M clicks, seed 17 | 4 | 18.130 s | **14.081 s** | **22.3%** |
+| Generated 20M events / 5M clicks, seed 17 | 6 | 11.627 s | 11.296 s | 2.8% |
+| Public 1M events / 250K clicks, seed 1 | 10 | 0.466 s | 0.427 s | 8.3% |
 
-The updated 20M runs ranged from 13.022–17.080 seconds; all samples are retained.
-This generated input contains 1,921,192,469 CSV bytes and is a surrogate for the
-hidden portal data. Both complete output tables matched the previous version in
-every paired round. Peak child RSS on 20M fell from 3.76 to 3.62 GiB.
-A separate ten-run batch through `sh run.sh` measured **0.592 s median** on 1M
-(0.558–0.735 s). Raw samples and provenance are in `logs/paired-final-1m.json`,
-`logs/paired-final-20m.json`, `logs/native-v2-final.json` and
-`logs/environment-v2.json`.
+The Mac 20M candidate ranged from **9.230 to 13.297 seconds**, versus 10.607–13.089 s
+for the baseline. This batch shows a modest median improvement amid substantial
+variation, not a repeatable multi-second gain. All samples, including slower
+candidate runs, are retained in `logs/paired-v3-final-20m.json` and
+`logs/paired-v3-final-1m.json`. Environment and source/binary hashes are in
+`logs/environment-v3.json`. `logs/native-v3-final.json` records a separate ten-run
+batch through `sh run.sh`; exploratory per-change comparisons are named
+`logs/paired-v3-{identity,grouping,parser}-20m.json`.
 
-These are local macOS measurements on an Intel Core i5-1038NG7, 4 physical cores /
-8 hardware threads, 16 GiB RAM, `NCPU=8`. Paired runs alternate baseline/candidate
-order. Timing includes process startup, reading, computation, Parquet output and
-normal process exit; comparison and compilation are outside the timer. Every
-invocation uses a fresh process and output directory. Filesystem caches are not
-flushed and no warmup samples are discarded. These results do not establish the
-new portal score or cold-cache performance.
+These measurements use macOS 15.2, an Intel Core i5-1038NG7, 4 physical cores /
+8 hardware threads, 16 GiB RAM, and `NCPU=8`. Every invocation is a fresh process
+with fresh outputs. Timing includes startup, all input reads, computation,
+Parquet writing and normal cleanup/exit. Compilation and answer comparison are
+outside the timer. Filesystem caches are not flushed and no samples are dropped.
+Compare paired runs within one batch: changes in machine load and cache state
+make separate batches unsuitable for calculating speedup. These local times do
+not predict the portal score or establish cold-cache performance.
 
-### Where the overhead went
+### Changes in this pass
 
-Monotonic-clock markers separate time outside the internal pipeline timer:
+- Reuse one contiguous string-to-ID table throughout identity joining and lookup;
+  canonicalize its values in place. Setup's 20M median fell from 2.167 to 0.902 s
+  in the final local batch.
+- Reuse that map implementation to intern aggregation IDs, group records by dense
+  person ID in linear time, then sort timestamps within each person's group.
+  Large shared-device groups and click-ID tie rules remain supported.
+- Scan CSV delimiters and quotes together using SSE2 on x86, with the original
+  scalar parser on other architectures. LF-only records, exact quoting, CR,
+  whitespace, nulls and malformed-field rules remain unchanged.
+- Cache fully validated date prefixes within each worker, accelerate short
+  numeric timestamps, and fix a transient signed overflow at `INT64_MAX` in the
+  old numeric parser. No cache survives a process and no answers are loaded.
 
-| Phase, public 1M | Previous median | Updated median |
-| --- | ---: | ---: |
-| Launch, loader and global initialization | 0.229 s | 0.081 s |
-| Local object cleanup after pipeline timer | 0.065 s | 0.016 s |
-| Final shutdown and parent wait overhead | 0.012 s | 0.005 s |
+### Correctness and Linux verification
 
-The shared Arrow libraries dominated launch: a no-op linked against them took
-0.190 s end to end, versus 0.009 s without Arrow. The default build now links a
-smaller static Arrow/Parquet build and strips unused code; OS/C++ libraries remain
-dynamic. The shell runner also avoids an extra `dirname` process. First launches
-after linking can still be slower and are retained in the diagnostic logs.
-See `logs/lifecycle-before.json`, `logs/lifecycle-final.json`, the
-`logs/lifecycle-probe-*.json` controls and `scripts/loader_probe.cpp`. Phase medians
-are calculated independently and need not sum to the median total.
+- **36/36 official fixtures pass** (`logs/native-v3-fixtures.log`).
+- **Exact public answer match:** 117,038 user/day rows and 27,400 campaign/day rows,
+  with no differing rows or duplicate keys (`logs/native-v3-dev-compare.log`).
+- Four generated seeds and a wide-date-window case match the Python reference at
+  `NCPU=1` and `NCPU=8` (`logs/native-v3-generated-checks.log`).
+- Each SIMD/scalar parser run passes **361,548 CSV and 203,052 timestamp
+  comparisons** under AddressSanitizer and UndefinedBehaviorSanitizer, including
+  protected-page input boundaries (`logs/native-v3-parser-*.log`).
+- **Linux container build, both sanitizer modes, and 36/36 container fixtures
+  pass** (`logs/linux-container-v3-ci.json`).
+- All 16 local and 6 Linux final paired rounds match both complete tables. The 20M input contains
+  1,921,192,469 CSV bytes and yields 2,249,563 user/day and 28,014 campaign/day rows.
 
-The larger-data improvements use compact integer person IDs for sorting, cached
-event-ID hashes and smaller deduplication tables, a contiguous frozen identity
-lookup, and reusable campaign/date accumulators. Dense accumulators have a shared
-64 MiB budget and fall back to sparse maps for wide date windows. Full IDs are
-still compared on hash matches. Normal destructors and file closing remain enabled.
+The Linux workflow builds the native container and runs parser checks plus all
+fixtures with read-only root, network disabled and UID 1000. A push commit whose
+message contains `[benchmark]` additionally compares the previous and current
+containers on the generated 20M input. This optional comparison uses 4 vCPUs /
+12 GiB on a GitHub runner and includes Docker client startup and runner cleanup;
+it is not the portal's exact environment or timer. The benchmark JSON is printed
+in the workflow log for retrieval. Docker is unavailable on the local Mac.
+The hidden portal input and the 60M final workload remain unmeasured.
 
-Validation of the updated binary:
+### Earlier measurements
 
-- **36/36 official fixtures pass** (`logs/native-v2-fixtures.log`).
-- **Exact public answer match**, including all rows and duplicate-key checks
-  (`logs/native-v2-dev-compare.log`).
-- Four additional generator seeds plus a wide date-window case match the Python
-  reference at both `NCPU=1` and `NCPU=8` (`logs/native-v2-generated-checks.log`).
-- All 14 paired rounds match both complete tables, including the generated 20M
-  input: 2,249,563 user/day rows and 28,014 campaign/day rows.
-- **Linux container build and all 36 fixtures pass** in
-  [GitHub Actions](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44842344593),
-  with read-only root, network disabled and UID 1000, at 2 CPUs / 6 GiB.
-  See `logs/linux-container-ci.json`. This is a portability check, not a competition
-  performance benchmark; `.github/workflows/native.yml` repeats it on code changes.
+The previous optimization pass (`b4df5c3`, documented at `a7cd5c1`) compared against
+`c697d57`: its paired medians were 18.130 → 14.081 s on 20M and 0.911 → 0.593 s on
+1M (`logs/paired-final-*.json`). Those belong to a different measurement batch.
+That pass also replaced large shared Arrow libraries with a minimal static
+Arrow/Parquet build: local launch/initialization fell from 0.229 to 0.081 s,
+cleanup from 0.065 to 0.016 s, and final shutdown from 0.012 to 0.005 s
+(`logs/lifecycle-before.json`, `logs/lifecycle-final.json`). Normal destruction
+remains enabled; phase medians need not sum to the median total.
 
-Docker is unavailable on the development machine; Linux validation ran in CI.
-The hidden portal input, 60M final workload and cold-cache
-performance remain unmeasured. No submission is made by these scripts.
-The exploratory `logs/paired-20m-initial.json` overlapped correctness checks and is
-explicitly excluded from reported speedups. Published logs replace the local
-checkout path with `.` without changing measurements.
-
-## Previous baseline results
-
-The public seed-1 dataset requests **1,000,000 events and 250,000 clicks**.
-Its CSV inputs occupy 96,210,343 bytes, including lookups, duplicates, and malformed rows.
-
-The first published native batch measured **0.918 seconds median end to end**, with
-**all 10 runs below one second**. The Python reference measured 24.194 seconds
-median on this same machine: approximately **26.4× faster**.
-
-| Implementation | Runs | Minimum | Median | Maximum | Peak child RSS |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Python/DuckDB reference | 3 | 22.879 s | 24.194 s | 26.268 s | 811 MiB |
-| Native C++ via `run.sh` | 10 | 0.848 s | 0.918 s | 0.954 s | 223 MiB |
-
-Every sample and environment details are saved in `logs/native-final.json`,
-`logs/baseline-final.json`, and `logs/environment.json`. An earlier tuning batch
-included a 1.262-second first run after linking new Arrow libraries
-(`logs/native-8-tuned.json`); startup can exceed one second.
-Published logs replace the local checkout path with `.`; measured values are unchanged.
-
-Timings include process startup, reading every input, all computation, Parquet
-writing and process exit. They exclude compilation, data generation and answer
-comparison. Every run is a fresh process with an empty output directory; the
-filesystem cache is **not flushed**. This establishes subsecond repeated runs,
-not a guaranteed cold-start or competition time.
-
-Measured on macOS 15.2, Intel Core i5-1038NG7 at 2.00 GHz, 4 cores / 8 hardware
-threads, 16 GiB RAM, with `NCPU=8`. The binary uses portable C++17 and `-O3`,
-without `-march=native`. Arrow/Parquet 19.0.1 supplies output encoding.
-
-Validation:
-
-- **36/36 official fixtures pass** through `run.sh` (`logs/native-fixtures.log`).
-- **Exact public answer match**: 117,038 user/day rows and 27,400 campaign/day
-  rows, no differing rows or duplicate keys (`logs/native-dev-compare.log`).
-- Totals: 179,366 sessions, 977,930 surviving events, 376,461,330 revenue cents.
-- Four additional official-generator seeds, 1,000–100,000 events, match the
-  Python reference at both `NCPU=1` and `NCPU=8` (`logs/generated-checks.log`).
-
-The earlier session measured the Python baseline at 61.41 seconds on a Linux
-Xeon with different software and resources. That figure is historical context,
-not a directly comparable speedup measurement. This Mac uses Python 3.11.7,
-DuckDB 1.4.5, and Polars 1.38.1 for the retained reference/checker; the previous
-session's DuckDB 1.5.6 and Polars 2.1.0 pins were unavailable in this setup.
+The original native version measured 0.918 s median on public 1M, compared with
+24.194 s for the retained Python reference (`logs/native-final.json`,
+`logs/baseline-final.json`). A first launch after linking can exceed one second.
+Published logs replace the local checkout path with `.` without changing values.
 
 ## Build and run locally
 
@@ -233,17 +214,29 @@ LINKS_PER_100_USERS=200 build/surrogate_gen dev-tools/surrogate/s20mL 20000000 5
 ```
 
 To reproduce the larger comparison, set `BASELINE` to an executable built from
-commit `c697d57` using that revision's `scripts/build_native.py`, then run:
+commit `a7cd5c1` using that revision's `scripts/build_minimal.cmake`, then run:
 
 ```sh
 generator/target/release/generate --seed 17 --events 20000000 \
   --clicks 5000000 --threads 4 --output dev-tools/scale-20m
 python scripts/paired_benchmark.py --data dev-tools/scale-20m \
   --baseline "$BASELINE" --candidate build/shopping-sessions \
-  --rounds 4 --threads 8 --report logs/local-paired-20m.json
+  --rounds 6 --threads 8 --report logs/local-paired-20m.json
 python scripts/profile_lifecycle.py --data dev --runs 5 --threads 8 \
   --report logs/local-lifecycle.json -- sh run.sh
+python scripts/check_parser_semantics.py
+python scripts/check_parser_semantics.py --scalar
 ```
+
+With Linux, Docker and Cargo available, reproduce the container comparison with:
+
+```sh
+make build IMAGE=shopping-sessions:ci
+python scripts/benchmark_linux.py
+```
+
+This downloads the checksum-pinned official generator, builds `a7cd5c1` as the
+baseline, generates fresh 20M input, and writes `logs/linux-v3-final-20m.json`.
 
 The baseline can still be run independently:
 

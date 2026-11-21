@@ -5,13 +5,13 @@
 #include <arrow/api.h>
 #include <arrow/io/api.h>
 #include <atomic>
-#if defined(__SSE2__)
-#include <emmintrin.h>
-#endif
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -165,6 +165,73 @@ struct Inputs {
 };
 
 template <size_t N, class F> void rows(SV text, bool header, F f) {
+#if defined(__SSE2__)
+    if (header) {
+        auto p = text.find('\n');
+        if (p == SV::npos)
+            return;
+        text.remove_prefix(p + 1);
+    }
+    if (text.empty())
+        return;
+    // Scan commas, quotes and LF together. Count quotes while scanning, so a
+    // valid quoted field never needs a second pass over its interior. Only LF
+    // ends a row; CR, spaces and non-ASCII bytes remain ordinary field data.
+    std::array<SV, N> fields;
+    const char *field = text.data(), *cursor = field, *end = field + text.size();
+    size_t count = 0, quotes = 0;
+    bool good = true;
+    auto special = [&](const char *position, char c) {
+        if (c == '"') {
+            ++quotes;
+            return;
+        }
+        if (count < N) {
+            SV value(field, size_t(position - field));
+            if (quotes) {
+                if (quotes != 2 || value.size() < 2 || value.front() != '"' || value.back() != '"')
+                    good = false;
+                else {
+                    value.remove_prefix(1);
+                    value.remove_suffix(1);
+                }
+            }
+            fields[count++] = value;
+        } else
+            good = false;
+        quotes = 0;
+        // A synthetic terminator handles a final row without LF. Do not form a
+        // pointer beyond the one-past-end position of the mapped input.
+        field = c ? position + 1 : position;
+        if (c != ',') {
+            if (good && count == N)
+                f(fields);
+            good = true;
+            count = 0;
+        }
+    };
+    const __m128i comma = _mm_set1_epi8(','), quote = _mm_set1_epi8('"'), lf = _mm_set1_epi8('\n');
+    while (size_t(end - cursor) >= 16) {
+        __m128i bytes = _mm_loadu_si128(reinterpret_cast<const __m128i *>(cursor));
+        unsigned mask = unsigned(_mm_movemask_epi8(_mm_or_si128(
+            _mm_or_si128(_mm_cmpeq_epi8(bytes, comma), _mm_cmpeq_epi8(bytes, quote)),
+            _mm_cmpeq_epi8(bytes, lf))));
+        while (mask) {
+            unsigned at = unsigned(__builtin_ctz(mask));
+            special(cursor + at, cursor[at]);
+            mask &= mask - 1;
+        }
+        cursor += 16;
+    }
+    while (cursor != end) {
+        char c = *cursor;
+        if (c == ',' || c == '"' || c == '\n')
+            special(cursor, c);
+        ++cursor;
+    }
+    if (field != end || count)
+        special(end, '\0');
+#else
     if (header) {
         auto p = text.find('\n');
         if (p == SV::npos)
@@ -206,6 +273,7 @@ template <size_t N, class F> void rows(SV text, bool header, F f) {
         if (good)
             f(fields);
     }
+#endif
 }
 // One pass over a headerless chunk. Commas, quotes and LFs are located with
 // SSE2 bitmasks; any line that contains a quote is handed to rows<N>, which
@@ -291,22 +359,24 @@ static I64 days_from_civil(int y, unsigned m, unsigned d) {
 static I64 timestamp(SV s) {
     if (s.empty())
         return BAD;
-    if (s.size() != 20 && s.size() != 25) {
+    if ((s.size() != 20 && s.size() != 25) || s[4] != '-') {
         I64 n = 0;
-        for (unsigned char c : s) {
-            if (c < '0' || c > '9' || n > (std::numeric_limits<I64>::max() - (c - '0')) / 10)
-                return BAD;
-            n = n * 10 + c - '0';
-        }
-        return n;
-    }
-    // A 20/25-character all-digit timestamp can have arbitrarily many zeroes.
-    if (s[4] != '-') {
-        I64 n = 0;
-        for (unsigned char c : s) {
-            if (c < '0' || c > '9' || n > (std::numeric_limits<I64>::max() - (c - '0')) / 10)
-                return BAD;
-            n = n * 10 + c - '0';
+        // Up to 18 decimal digits cannot overflow int64_t. The slower path
+        // retains arbitrary leading zeroes and checked 19+ digit conversion.
+        if (s.size() <= 18) {
+            for (unsigned char c : s) {
+                unsigned digit = unsigned(c) - '0';
+                if (digit > 9)
+                    return BAD;
+                n = n * 10 + digit;
+            }
+        } else {
+            for (unsigned char c : s) {
+                unsigned digit = unsigned(c) - '0';
+                if (digit > 9 || n > (std::numeric_limits<I64>::max() - digit) / 10)
+                    return BAD;
+                n = n * 10 + digit;
+            }
         }
         return n;
     }
@@ -315,22 +385,44 @@ static I64 timestamp(SV s) {
     auto number = [&](int at, int count) {
         int n = 0;
         for (int i = 0; i < count; ++i) {
-            unsigned char c = s[at + i];
-            if (c < '0' || c > '9')
+            unsigned digit = unsigned(static_cast<unsigned char>(s[at + i])) - '0';
+            if (digit > 9)
                 return -1;
-            n = n * 10 + c - '0';
+            n = n * 10 + digit;
         }
         return n;
     };
-    int y = number(0, 4), m = number(5, 2), d = number(8, 2), h = number(11, 2), mi = number(14, 2),
-        sec = number(17, 2);
-    static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    if (y < 1 || m < 1 || m > 12 || d < 1 || h < 0 || h > 23 || mi < 0 || mi > 59 || sec < 0 ||
-        sec > 59)
+    // Many timestamps share a date. Cache only fully validated YYYY-MM-DD
+    // prefixes, comparing all ten bytes before reusing the civil-date result.
+    // The cache belongs to this worker thread and never survives a process.
+    struct DateEntry {
+        uint64_t prefix = 0;
+        uint16_t suffix = 0;
+        I64 midnight = BAD;
+    };
+    static thread_local std::array<DateEntry, 32> dates;
+    uint64_t prefix;
+    uint16_t suffix;
+    std::memcpy(&prefix, s.data(), sizeof(prefix));
+    std::memcpy(&suffix, s.data() + 8, sizeof(suffix));
+    auto &entry = dates[(unsigned(static_cast<unsigned char>(s[8])) * 10 +
+                         unsigned(static_cast<unsigned char>(s[9]))) & 31];
+    I64 midnight;
+    if (entry.prefix == prefix && entry.suffix == suffix && entry.midnight != BAD)
+        midnight = entry.midnight;
+    else {
+        int y = number(0, 4), m = number(5, 2), d = number(8, 2);
+        static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        if (y < 1 || m < 1 || m > 12 || d < 1 ||
+            d > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+            return BAD;
+        midnight = days_from_civil(y, m, d) * DAY;
+        entry = {prefix, suffix, midnight};
+    }
+    int h = number(11, 2), mi = number(14, 2), sec = number(17, 2);
+    if (h < 0 || h > 23 || mi < 0 || mi > 59 || sec < 0 || sec > 59)
         return BAD;
-    if (d > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
-        return BAD;
-    I64 t = days_from_civil(y, m, d) * DAY + (h * 3600 + mi * 60 + sec) * 1000LL;
+    I64 t = midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
     if (s.size() == 20)
         return s[19] == 'Z' ? t : BAD;
     if ((s[19] != '+' && s[19] != '-') || s[22] != ':')

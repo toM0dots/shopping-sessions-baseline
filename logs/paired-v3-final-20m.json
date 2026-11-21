@@ -1,0 +1,123 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "data": "dev-tools/scale-20m",
+  "threads": 8,
+  "commands": {
+    "baseline": "build/shopping-sessions-baseline-a7cd5c1",
+    "candidate": "build/shopping-sessions"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 6 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 10.607257564988686,
+      "median_seconds": 11.62702927950886,
+      "max_seconds": 13.0886306350003,
+      "peak_rss_bytes": 3884744704
+    },
+    "candidate": {
+      "min_seconds": 9.230480944999726,
+      "median_seconds": 11.296432949486189,
+      "max_seconds": 13.297277806996135,
+      "peak_rss_bytes": 3886718976
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 11.245293078012764,
+      "peak_rss_bytes": 3873247232,
+      "exit_code": 0,
+      "stderr": "setup=1.88485 parse_events=3.26786 dedup_events=1.82658 clicks=1.04277 sessionize_aggregate=2.31734 write_parquet=0.698638 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":11.047}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 9.230480944999726,
+      "peak_rss_bytes": 3876814848,
+      "exit_code": 0,
+      "stderr": "setup=0.932612 parse_events=2.54649 dedup_events=1.65791 clicks=0.90701 sessionize_aggregate=2.30988 write_parquet=0.698334 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":9.06085}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 13.297277806996135,
+      "peak_rss_bytes": 3863650304,
+      "exit_code": 0,
+      "stderr": "setup=1.16436 parse_events=4.97261 dedup_events=2.39805 clicks=1.1654 sessionize_aggregate=2.61161 write_parquet=0.78506 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":13.1062}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 11.43443913399824,
+      "peak_rss_bytes": 3867025408,
+      "exit_code": 0,
+      "stderr": "setup=2.1185 parse_events=3.27351 dedup_events=1.8936 clicks=1.03235 sessionize_aggregate=2.24543 write_parquet=0.69549 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":11.2675}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 10.607257564988686,
+      "peak_rss_bytes": 3878486016,
+      "exit_code": 0,
+      "stderr": "setup=2.02052 parse_events=2.63172 dedup_events=1.66567 clicks=1.00915 sessionize_aggregate=2.37723 write_parquet=0.739132 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":10.4541}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 11.478801036981167,
+      "peak_rss_bytes": 3866628096,
+      "exit_code": 0,
+      "stderr": "setup=0.922295 parse_events=3.45545 dedup_events=2.19415 clicks=1.39138 sessionize_aggregate=2.60285 write_parquet=0.723317 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":11.3004}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 11.11406486199121,
+      "peak_rss_bytes": 3872911360,
+      "exit_code": 0,
+      "stderr": "setup=0.806919 parse_events=3.02334 dedup_events=2.01657 clicks=1.27815 sessionize_aggregate=3.08332 write_parquet=0.730354 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":10.9466}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 12.179814611998154,
+      "peak_rss_bytes": 3884744704,
+      "exit_code": 0,
+      "stderr": "setup=2.21595 parse_events=3.03961 dedup_events=2.12318 clicks=1.09318 sessionize_aggregate=2.81957 write_parquet=0.714398 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":12.0153}"
+    },
+    {
+      "round": 5,
+      "implementation": "baseline",
+      "wall_seconds": 13.0886306350003,
+      "peak_rss_bytes": 3775815680,
+      "exit_code": 0,
+      "stderr": "setup=2.39447 parse_events=3.65762 dedup_events=2.22126 clicks=1.18372 sessionize_aggregate=2.66159 write_parquet=0.789232 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":12.9194}"
+    },
+    {
+      "round": 5,
+      "implementation": "candidate",
+      "wall_seconds": 12.959180534002371,
+      "peak_rss_bytes": 3813523456,
+      "exit_code": 0,
+      "stderr": "setup=0.853822 parse_events=3.43305 dedup_events=3.16009 clicks=1.96032 sessionize_aggregate=2.59707 write_parquet=0.71403 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":12.7276}"
+    },
+    {
+      "round": 6,
+      "implementation": "candidate",
+      "wall_seconds": 10.741952985001262,
+      "peak_rss_bytes": 3886718976,
+      "exit_code": 0,
+      "stderr": "setup=0.881834 parse_events=2.94046 dedup_events=2.13209 clicks=1.05629 sessionize_aggregate=2.4598 write_parquet=1.08306 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":10.5622}"
+    },
+    {
+      "round": 6,
+      "implementation": "baseline",
+      "wall_seconds": 11.819619425019482,
+      "peak_rss_bytes": 3884511232,
+      "exit_code": 0,
+      "stderr": "setup=2.41013 parse_events=2.96717 dedup_events=1.83345 clicks=1.09484 sessionize_aggregate=2.57311 write_parquet=0.744748 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":11.6321}"
+    }
+  ]
+}

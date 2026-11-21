@@ -1,0 +1,37 @@
+{
+  "source_commit": "af0ae3642bf5aa9edd7b083d8f0b034641d677ea",
+  "run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821",
+  "job_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821/job/136662492933",
+  "conclusion": "success",
+  "runner": "ubuntu-24.04 GitHub-hosted runner",
+  "platform": "linux/amd64",
+  "compiler": "GNU 12.2.0 in Debian bookworm builder",
+  "docker_build_jobs": 4,
+  "fixture_cpu_limit": 2,
+  "fixture_memory_limit": "6 GiB",
+  "benchmark_cpu_limit": 4,
+  "benchmark_memory_limit": "12 GiB",
+  "parser_checks": {
+    "simd": "PASS: 361548 CSV and 203052 timestamp comparisons",
+    "scalar": "PASS: 361548 CSV and 203052 timestamp comparisons",
+    "sanitizers": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer"
+    ]
+  },
+  "fixtures": "36/36 passed",
+  "large_comparison": "Both complete output tables matched in all 6 paired rounds",
+  "report": "logs/linux-v3-final-20m.json",
+  "notes": "Linux CI validation and generated-data benchmark; not a portal submission.",
+  "log_excerpts": [
+    "2026-11-21T00:37:24.3533378Z PASS 361548 CSV comparisons; 203052 timestamp comparisons",
+    "2026-11-21T00:37:26.2046839Z PASS 361548 CSV comparisons; 203052 timestamp comparisons",
+    "2026-11-21T00:37:26.2213293Z ##[group]Run docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .",
+    "2026-11-21T00:40:31.0274667Z #20 writing image sha256:02d9d16009d75cdb62b3039df181fd78b3305d7b5709bb88ccd11b13de2c649e done",
+    "2026-11-21T00:40:31.0274978Z #20 naming to docker.io/library/shopping-sessions:ci done",
+    "2026-11-21T00:40:31.0366684Z ##[group]Run .venv/bin/python scripts/run_fixtures.py fixtures -- scripts/docker_run.sh",
+    "2026-11-21T00:40:38.7083901Z 36/36 fixtures passed",
+    "2026-11-21T00:40:45.0225663Z #19 writing image sha256:cbf3b0f27d0f26b91d57ad2f3fb6dbb306cd9b8d3376214efe57ea098287464b done",
+    "2026-11-21T00:40:45.0226196Z #19 naming to docker.io/library/shopping-sessions:benchmark-baseline done"
+  ]
+}

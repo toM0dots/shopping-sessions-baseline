@@ -44,6 +44,11 @@ jobs:
         run: |
           python3 -m venv .venv
           .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Check parser semantics and memory boundaries
+        run: |
+          git fetch --depth 1 origin a7cd5c1d43390cfb3960f2a11a9e13a5d44c8f9f
+          .venv/bin/python scripts/check_parser_semantics.py
+          .venv/bin/python scripts/check_parser_semantics.py --scalar
       - name: Build Linux image
         run: docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
       - name: Run all fixtures with scorer isolation flags
@@ -52,3 +57,6 @@ jobs:
           CPUS: "2"
           MEM: 6g
         run: .venv/bin/python scripts/run_fixtures.py fixtures -- scripts/docker_run.sh
+      - name: Compare 20M-event containers when requested
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[benchmark]')
+        run: .venv/bin/python scripts/benchmark_linux.py

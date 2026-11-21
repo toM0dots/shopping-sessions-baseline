@@ -1,0 +1,123 @@
+{
+  "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+  "data": "official generator: seed 17, 20M events, 5M clicks",
+  "threads": 4,
+  "commands": {
+    "baseline_image": "shopping-sessions:benchmark-baseline",
+    "candidate_image": "shopping-sessions:ci"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 6 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 7.190774304000001,
+      "median_seconds": 7.284725457499974,
+      "max_seconds": 16.257110582999985
+    },
+    "candidate": {
+      "min_seconds": 5.971361648000027,
+      "median_seconds": 5.993263862500015,
+      "max_seconds": 7.146056053999985
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 16.257110582999985,
+      "exit_code": 0,
+      "stderr": "setup=1.02268 parse_events=2.15268 dedup_events=1.22376 clicks=0.669797 sessionize_aggregate=1.47619 write_parquet=0.341444 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":6.88968}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 6.002226731999997,
+      "exit_code": 0,
+      "stderr": "setup=0.392735 parse_events=1.84788 dedup_events=1.17273 clicks=0.662007 sessionize_aggregate=1.07892 write_parquet=0.339799 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":5.49729}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 5.978787764000003,
+      "exit_code": 0,
+      "stderr": "setup=0.389949 parse_events=1.84758 dedup_events=1.16616 clicks=0.659021 sessionize_aggregate=1.06939 write_parquet=0.337478 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":5.47276}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 7.273041527999965,
+      "exit_code": 0,
+      "stderr": "setup=0.963187 parse_events=2.03796 dedup_events=1.21444 clicks=0.724104 sessionize_aggregate=1.48891 write_parquet=0.338789 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":6.77059}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 7.190774304000001,
+      "exit_code": 0,
+      "stderr": "setup=0.979259 parse_events=2.01979 dedup_events=1.16915 clicks=0.70503 sessionize_aggregate=1.49532 write_parquet=0.339217 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":6.71098}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 5.971361648000027,
+      "exit_code": 0,
+      "stderr": "setup=0.391442 parse_events=1.85062 dedup_events=1.17466 clicks=0.659849 sessionize_aggregate=1.08199 write_parquet=0.336748 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":5.49851}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 5.9843009930000335,
+      "exit_code": 0,
+      "stderr": "setup=0.401493 parse_events=1.85616 dedup_events=1.16811 clicks=0.66119 sessionize_aggregate=1.07655 write_parquet=0.333058 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":5.49978}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 7.2254809959999875,
+      "exit_code": 0,
+      "stderr": "setup=0.98956 parse_events=2.02893 dedup_events=1.16604 clicks=0.701473 sessionize_aggregate=1.51764 write_parquet=0.334863 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":6.74165}"
+    },
+    {
+      "round": 5,
+      "implementation": "baseline",
+      "wall_seconds": 7.296409386999983,
+      "exit_code": 0,
+      "stderr": "setup=1.0967 parse_events=2.03047 dedup_events=1.17176 clicks=0.709926 sessionize_aggregate=1.45233 write_parquet=0.335486 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":6.79982}"
+    },
+    {
+      "round": 5,
+      "implementation": "candidate",
+      "wall_seconds": 6.03518503600003,
+      "exit_code": 0,
+      "stderr": "setup=0.395299 parse_events=1.85087 dedup_events=1.16396 clicks=0.660795 sessionize_aggregate=1.11827 write_parquet=0.348588 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":5.54093}"
+    },
+    {
+      "round": 6,
+      "implementation": "candidate",
+      "wall_seconds": 7.146056053999985,
+      "exit_code": 0,
+      "stderr": "setup=0.531281 parse_events=2.17586 dedup_events=1.4233 clicks=0.734619 sessionize_aggregate=1.31556 write_parquet=0.373026 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":6.55744}"
+    },
+    {
+      "round": 6,
+      "implementation": "baseline",
+      "wall_seconds": 8.673831908000011,
+      "exit_code": 0,
+      "stderr": "setup=1.42864 parse_events=2.31185 dedup_events=1.3053 clicks=0.845534 sessionize_aggregate=1.79794 write_parquet=0.375028 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":8.0679}"
+    }
+  ],
+  "baseline_commit": "a7cd5c1d43390cfb3960f2a11a9e13a5d44c8f9f",
+  "candidate_commit": "af0ae3642bf5aa9edd7b083d8f0b034641d677ea",
+  "generator_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/generator.zip",
+  "generator_sha256": "13724cadbac5a99d847e27cea911cd2e338ff972b46c2039da87452011bb101e",
+  "input_csv_bytes": 1921192469,
+  "host_logical_cpus": 4,
+  "host_memory_bytes": 16760344576,
+  "container_cpu_limit": 4,
+  "container_memory_limit": "12g",
+  "memory_measurement": "Not measured: Docker daemon owns the pipeline process",
+  "timing_scope": "Docker client startup through runner cleanup, including native pipeline; comparison excluded",
+  "notes": "Linux CI comparison, not the hidden portal score; fresh containers and outputs, caches not flushed, all samples retained",
+  "workflow_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821",
+  "workflow_job_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821/job/136662492933"
+}
