@@ -5,7 +5,11 @@
 #include <arrow/api.h>
 #include <arrow/io/api.h>
 #include <atomic>
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
@@ -22,6 +26,7 @@
 #include <thread>
 #include <time.h>
 #include <unistd.h>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -180,6 +185,60 @@ template <size_t N, class F> void rows(SV text, bool header, F f) {
             f(fields);
     }
 }
+// One pass over a headerless chunk. Commas, quotes and LFs are located with
+// SSE2 bitmasks; any line that contains a quote is handed to rows<N>, which
+// applies the exact quoting rules. Other lines need exactly N - 1 commas.
+template <size_t N, class F> void fast_rows(SV text, F f) {
+    const char *p = text.data(), *end = p + text.size(), *line = p, *field = p;
+    std::array<SV, N> fields;
+    size_t commas = 0;
+    bool quoted = false;
+    auto special = [&](const char *q) {
+        char c = *q;
+        if (c == ',') {
+            if (commas < N)
+                fields[commas] = SV(field, q - field);
+            ++commas;
+            field = q + 1;
+        } else if (c == '"') {
+            quoted = true;
+        } else {
+            if (quoted)
+                rows<N>(SV(line, q - line), false, f);
+            else if (commas == N - 1) {
+                fields[N - 1] = SV(field, q - field);
+                f(fields);
+            }
+            line = field = q + 1;
+            commas = 0;
+            quoted = false;
+        }
+    };
+#if defined(__SSE2__)
+    const __m128i comma = _mm_set1_epi8(','), quote = _mm_set1_epi8('"'), lf = _mm_set1_epi8('\n');
+    for (; end - p >= 16; p += 16) {
+        __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i *>(p));
+        unsigned mask = unsigned(_mm_movemask_epi8(_mm_or_si128(
+            _mm_or_si128(_mm_cmpeq_epi8(v, comma), _mm_cmpeq_epi8(v, quote)), _mm_cmpeq_epi8(v, lf))));
+        while (mask) {
+            special(p + __builtin_ctz(mask));
+            mask &= mask - 1;
+        }
+    }
+#endif
+    for (; p < end; ++p)
+        if (*p == ',' || *p == '"' || *p == '\n')
+            special(p);
+    if (line < end) {
+        // A final record without a trailing LF.
+        if (quoted)
+            rows<N>(SV(line, end - line), false, f);
+        else if (commas == N - 1) {
+            fields[N - 1] = SV(field, end - field);
+            f(fields);
+        }
+    }
+}
 static I64 days_from_civil(int y, unsigned m, unsigned d) {
     y -= m <= 2;
     const int era = (y >= 0 ? y : y - 399) / 400;
@@ -255,89 +314,6 @@ static I64 floor_day(I64 t) {
     return d - (t % DAY < 0);
 }
 
-// Once linking is finished, all identity queries are read-only. A contiguous
-// lookup avoids unordered_map node chasing on every event and click.
-class PersonLookup {
-    struct Entry {
-        SV key;
-        uint32_t person = 0, tag = 0;
-    };
-    std::vector<Entry> entries;
-
-  public:
-    explicit PersonLookup(size_t count) {
-        size_t capacity = 8;
-        while (capacity * 7 / 10 < count)
-            capacity *= 2;
-        entries.resize(capacity);
-    }
-    void insert(SV key, uint32_t person) {
-        uint64_t hash = Hash{}(key);
-        size_t at = hash & (entries.size() - 1);
-        while (!entries[at].key.empty())
-            at = (at + 1) & (entries.size() - 1);
-        entries[at] = {key, person, uint32_t(hash >> 32)};
-    }
-    const uint32_t *find(SV key) const {
-        uint64_t hash = Hash{}(key);
-        size_t at = hash & (entries.size() - 1);
-        while (!entries[at].key.empty()) {
-            auto &entry = entries[at];
-            if (entry.tag == uint32_t(hash >> 32) && entry.key == key)
-                return &entry.person;
-            at = (at + 1) & (entries.size() - 1);
-        }
-        return nullptr;
-    }
-};
-
-struct People {
-    Map<uint32_t> ids;
-    std::vector<uint32_t> parent, size;
-    std::vector<SV> names;
-    std::unique_ptr<PersonLookup> lookup;
-    uint32_t id(SV s) {
-        auto [it, new_id] = ids.emplace(s, parent.size());
-        if (new_id) {
-            parent.push_back(it->second);
-            size.push_back(1);
-            names.push_back(s);
-        }
-        return it->second;
-    }
-    uint32_t find(uint32_t i) {
-        while (parent[i] != i) {
-            parent[i] = parent[parent[i]];
-            i = parent[i];
-        }
-        return i;
-    }
-    void join(SV a, SV b) {
-        auto x = find(id(a)), y = find(id(b));
-        if (x == y)
-            return;
-        if (size[x] < size[y])
-            std::swap(x, y);
-        parent[y] = x;
-        size[x] += size[y];
-        names[x] = std::min(names[x], names[y]);
-    }
-    void freeze() {
-        lookup = std::make_unique<PersonLookup>(ids.size());
-        for (auto &[key, i] : ids)
-            lookup->insert(key, find(i));
-        // These mutable structures are no longer needed. Ordinary destruction
-        // is retained; its cost is included in end-to-end process timing.
-        Map<uint32_t>().swap(ids);
-        std::vector<uint32_t>().swap(parent);
-        std::vector<uint32_t>().swap(size);
-    }
-    SV person(SV s) const {
-        auto person = lookup->find(s);
-        return person ? names[*person] : s;
-    }
-};
-
 template <class F> void parallel(size_t jobs, size_t threads, F f) {
     std::atomic<size_t> next{0};
     std::exception_ptr failure;
@@ -379,8 +355,163 @@ static std::vector<SV> chunks(const std::vector<SV> &files) {
     }
     return jobs;
 }
+// A person name together with its hash, so later phases never rehash cold input.
+struct PersonRef {
+    SV name;
+    uint64_t hash;
+};
+
+// Linked IDs. Link rows are parsed in parallel, IDs are interned into
+// hash-sharded tables in parallel, and union-find then runs on dense integers.
+// Afterwards every table is read-only and serves identity queries directly.
+class Identity {
+    struct Entry {
+        SV key;
+        uint32_t tag = 0, canon = 0;
+    };
+    struct Ref {
+        SV key;
+        uint64_t hash;
+        uint32_t slot; // 2 * pair index + side, relative to its job
+    };
+    struct Shard {
+        std::vector<Entry> table;
+        size_t mask = 0;
+        uint32_t base = 0;
+    };
+    std::array<Shard, SHARDS> shards;
+    std::vector<SV> names;
+    std::vector<uint64_t> hashes;
+    static size_t index(uint64_t hash, size_t mask) { return (hash / SHARDS) & mask; }
+
+  public:
+    void build(const std::vector<SV> &jobs, size_t threads) {
+        // Pass 1: parse each chunk and bucket its ID references by shard.
+        std::vector<std::array<std::vector<Ref>, SHARDS>> refs(jobs.size());
+        std::vector<uint32_t> pairs(jobs.size() + 1);
+        parallel(jobs.size(), threads, [&](size_t job, size_t) {
+            uint32_t n = 0;
+            fast_rows<2>(jobs[job], [&](auto &r) {
+                if (r[0].empty() || r[1].empty())
+                    return;
+                for (int side = 0; side < 2; ++side) {
+                    uint64_t hash = Hash{}(r[side]);
+                    refs[job][hash & (SHARDS - 1)].push_back({r[side], hash, 2 * n + side});
+                }
+                ++n;
+            });
+            pairs[job + 1] = n;
+        });
+        for (size_t j = 0; j < jobs.size(); ++j)
+            pairs[j + 1] += pairs[j];
+        // Pass 2: intern each shard independently. Sides receive (shard, local ID).
+        std::vector<uint64_t> sides(size_t(pairs.back()) * 2);
+        std::array<std::vector<SV>, SHARDS> local_names;
+        std::array<std::vector<uint64_t>, SHARDS> local_hashes;
+        parallel(SHARDS, threads, [&](size_t shard, size_t) {
+            size_t count = 0;
+            for (auto &job : refs)
+                count += job[shard].size();
+            size_t cap = 16;
+            while (cap * 2 / 3 < count)
+                cap *= 2;
+            auto &sh = shards[shard];
+            sh.table.assign(cap, {});
+            sh.mask = cap - 1;
+            auto &nm = local_names[shard];
+            auto &hs = local_hashes[shard];
+            for (size_t j = 0; j < refs.size(); ++j) {
+                for (auto &r : refs[j][shard]) {
+                    uint32_t tag = uint32_t(r.hash >> 32);
+                    size_t i = index(r.hash, sh.mask);
+                    while (!sh.table[i].key.empty() &&
+                           (sh.table[i].tag != tag || sh.table[i].key != r.key))
+                        i = (i + 1) & sh.mask;
+                    auto &e = sh.table[i];
+                    if (e.key.empty()) {
+                        e = {r.key, tag, uint32_t(nm.size())};
+                        nm.push_back(r.key);
+                        hs.push_back(r.hash);
+                    }
+                    sides[size_t(pairs[j]) * 2 + r.slot] = uint64_t(shard) << 32 | e.canon;
+                }
+                std::vector<Ref>().swap(refs[j][shard]);
+            }
+        });
+        std::vector<std::array<std::vector<Ref>, SHARDS>>().swap(refs);
+        uint32_t total = 0;
+        for (size_t s = 0; s < SHARDS; ++s) {
+            shards[s].base = total;
+            total += local_names[s].size();
+        }
+        names.resize(total);
+        hashes.resize(total);
+        parallel(SHARDS, threads, [&](size_t shard, size_t) {
+            auto base = shards[shard].base;
+            std::copy(local_names[shard].begin(), local_names[shard].end(), names.begin() + base);
+            std::copy(local_hashes[shard].begin(), local_hashes[shard].end(), hashes.begin() + base);
+            for (auto &e : shards[shard].table)
+                if (!e.key.empty())
+                    e.canon += base;
+        });
+        auto global = [&](uint64_t side) { return shards[side >> 32].base + uint32_t(side); };
+        std::vector<uint32_t> parent(total);
+        for (uint32_t i = 0; i < total; ++i)
+            parent[i] = i;
+        auto find = [&](uint32_t x) {
+            while (parent[x] != x) {
+                parent[x] = parent[parent[x]];
+                x = parent[x];
+            }
+            return x;
+        };
+        std::vector<uint32_t> size(total, 1);
+        for (size_t k = 0; k < sides.size(); k += 2) {
+            auto x = find(global(sides[k])), y = find(global(sides[k + 1]));
+            if (x == y)
+                continue;
+            if (size[x] < size[y])
+                std::swap(x, y);
+            parent[y] = x;
+            size[x] += size[y];
+        }
+        std::vector<uint32_t>().swap(size);
+        std::vector<uint64_t>().swap(sides);
+        // Flatten every path, then name each component by its bytewise-smallest ID.
+        std::vector<uint32_t> best(total);
+        for (uint32_t i = 0; i < total; ++i) {
+            parent[i] = find(i);
+            best[i] = i;
+        }
+        for (uint32_t i = 0; i < total; ++i) {
+            auto root = parent[i];
+            if (names[i] < names[best[root]])
+                best[root] = i;
+        }
+        parallel(SHARDS, threads, [&](size_t shard, size_t) {
+            for (auto &e : shards[shard].table)
+                if (!e.key.empty())
+                    e.canon = best[parent[e.canon]];
+        });
+    }
+    PersonRef person(SV s) const {
+        uint64_t hash = Hash{}(s);
+        auto &sh = shards[hash & (SHARDS - 1)];
+        if (sh.table.empty())
+            return {s, hash};
+        uint32_t tag = uint32_t(hash >> 32);
+        for (size_t i = index(hash, sh.mask);; i = (i + 1) & sh.mask) {
+            auto &e = sh.table[i];
+            if (e.key.empty())
+                return {s, hash};
+            if (e.tag == tag && e.key == s)
+                return {names[e.canon], hashes[e.canon]};
+        }
+    }
+};
+
 struct Event {
-    SV person;
+    PersonRef person;
     I64 ts;
     int cents;
     uint32_t category;
@@ -392,24 +523,123 @@ struct RawEvent {
     Event event;
 };
 struct Click {
-    SV id, person;
+    SV id;
+    PersonRef person;
     I64 ts;
     uint32_t campaign;
 };
-// Intern person names once per partition before sorting. Integer comparisons
-// avoid repeatedly chasing input-backed strings, while output names stay exact.
+// After interning, each person's records are grouped by a counting sort and
+// only the short per-person runs are ordered by time.
 struct CompactEvent {
     I64 ts;
-    uint32_t person;
     int cents;
     uint32_t category;
 };
 struct CompactClick {
     SV id;
     I64 ts;
-    uint32_t person, campaign;
+    uint32_t campaign;
 };
-template <class T> using Partitions = std::array<std::vector<T>, SHARDS>;
+// Shard-local person interning. Hashes were computed during parsing; full
+// names are still compared whenever hashes match, so grouping stays exact.
+class PersonTable {
+    struct Entry {
+        uint64_t hash;
+        SV name;
+        uint32_t id;
+    };
+    std::vector<Entry> entries;
+    std::vector<SV> names;
+    size_t mask;
+    size_t index(uint64_t hash) const { return (hash / SHARDS) & mask; }
+
+  public:
+    explicit PersonTable(size_t n) {
+        size_t cap = 16;
+        while (cap / 2 < n)
+            cap *= 2;
+        entries.assign(cap, {0, {}, UINT32_MAX});
+        mask = cap - 1;
+    }
+    uint32_t intern(const PersonRef &p) {
+        for (size_t i = index(p.hash);; i = (i + 1) & mask) {
+            auto &e = entries[i];
+            if (e.id == UINT32_MAX) {
+                if (names.size() * 2 >= entries.size())
+                    break;
+                e = {p.hash, p.name, uint32_t(names.size())};
+                names.push_back(p.name);
+                return e.id;
+            }
+            if (e.hash == p.hash && e.name == p.name)
+                return e.id;
+        }
+        grow();
+        return intern(p);
+    }
+    uint32_t find(const PersonRef &p) const {
+        for (size_t i = index(p.hash);; i = (i + 1) & mask) {
+            auto &e = entries[i];
+            if (e.id == UINT32_MAX)
+                return UINT32_MAX;
+            if (e.hash == p.hash && e.name == p.name)
+                return e.id;
+        }
+    }
+    void grow() {
+        std::vector<Entry> old(entries.size() * 2, {0, {}, UINT32_MAX});
+        old.swap(entries);
+        mask = entries.size() - 1;
+        for (auto &e : old)
+            if (e.id != UINT32_MAX) {
+                size_t i = index(e.hash);
+                while (entries[i].id != UINT32_MAX)
+                    i = (i + 1) & mask;
+                entries[i] = e;
+            }
+    }
+    size_t size() const { return names.size(); }
+    SV name(uint32_t id) const { return names[id]; }
+};
+// Append-only storage for partition buffers. Blocks grow geometrically and
+// never move, so records are written once instead of being copied on growth.
+template <class T> class BlockList {
+    static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>);
+    struct Free {
+        void operator()(T *p) const { std::free(p); }
+    };
+    std::vector<std::unique_ptr<T, Free>> blocks;
+    size_t count = 0, used = 0, capacity = 0;
+
+  public:
+    void push_back(const T &value) {
+        if (used == capacity) {
+            capacity = std::min<size_t>(size_t(256) << std::min<size_t>(blocks.size(), 6), 16384);
+            T *block = static_cast<T *>(std::malloc(capacity * sizeof(T)));
+            if (!block)
+                throw std::bad_alloc();
+            blocks.emplace_back(block);
+            used = 0;
+        }
+        new (blocks.back().get() + used++) T(value);
+        ++count;
+    }
+    size_t size() const { return count; }
+    template <class F> void each(F f) const {
+        for (size_t b = 0; b < blocks.size(); ++b) {
+            size_t n = b + 1 == blocks.size() ? used
+                                              : std::min<size_t>(size_t(256) << std::min<size_t>(b, 6), 16384);
+            const T *block = blocks[b].get();
+            for (size_t i = 0; i < n; ++i)
+                f(block[i]);
+        }
+    }
+    void release() {
+        std::vector<std::unique_ptr<T, Free>>().swap(blocks);
+        count = used = capacity = 0;
+    }
+};
+template <class T> using Partitions = std::array<BlockList<T>, SHARDS>;
 struct UserRow {
     SV person;
     int32_t day;
@@ -482,32 +712,39 @@ static void write_table(const fs::path &path, std::shared_ptr<arrow::Table> tabl
     auto stream = unwrap(arrow::io::FileOutputStream::Open(path.string()));
     parquet::WriterProperties::Builder properties;
     properties.compression(parquet::Compression::SNAPPY);
+    // Encode the columns of each row group concurrently; the file layout is unchanged.
+    auto arrow_properties = parquet::ArrowWriterProperties::Builder().set_use_threads(true)->build();
     check(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), stream, 65536,
-                                     properties.build()));
+                                     properties.build(), arrow_properties));
     check(stream->Close());
 }
-static void write_users(const fs::path &out,
-                        const std::array<std::vector<UserRow>, SHARDS> &results,
-                        const std::vector<SV> &categories) {
+// Rows from shards [first, last) form one Parquet part file.
+static void write_users(const fs::path &path,
+                        const std::array<std::vector<UserRow>, SHARDS> &results, size_t first,
+                        size_t last, const std::vector<SV> &categories) {
     arrow::StringBuilder user, category;
     arrow::Date32Builder day;
     arrow::Int64Builder sessions, events, revenue;
-    size_t n = 0;
-    for (auto &part : results)
-        n += part.size();
+    size_t n = 0, bytes = 0;
+    for (size_t s = first; s < last; ++s) {
+        n += results[s].size();
+        for (auto &r : results[s])
+            bytes += r.person.size();
+    }
     check(user.Reserve(n));
+    check(user.ReserveData(bytes));
     check(category.Reserve(n));
     check(day.Reserve(n));
     check(sessions.Reserve(n));
     check(events.Reserve(n));
     check(revenue.Reserve(n));
-    for (auto &part : results)
-        for (auto &r : part) {
-            check(user.Append(r.person.data(), r.person.size()));
-            check(day.Append(r.day));
-            check(sessions.Append(r.sessions));
-            check(events.Append(r.events));
-            check(revenue.Append(r.revenue));
+    for (size_t s = first; s < last; ++s)
+        for (auto &r : results[s]) {
+            user.UnsafeAppend(r.person.data(), r.person.size());
+            day.UnsafeAppend(r.day);
+            sessions.UnsafeAppend(r.sessions);
+            events.UnsafeAppend(r.events);
+            revenue.UnsafeAppend(r.revenue);
             if (r.category < 0)
                 check(category.AppendNull());
             else {
@@ -520,9 +757,9 @@ static void write_users(const fs::path &out,
          arrow::field("sessions", arrow::int64()), arrow::field("events", arrow::int64()),
          arrow::field("revenue_cents", arrow::int64()),
          arrow::field("top_category", arrow::utf8())});
-    write_table(out / "user_daily" / "part-0.parquet",
-                arrow::Table::Make(schema, {finish(user), finish(day), finish(sessions),
-                                            finish(events), finish(revenue), finish(category)}));
+    write_table(path, arrow::Table::Make(schema, {finish(user), finish(day), finish(sessions),
+                                                  finish(events), finish(revenue),
+                                                  finish(category)}));
 }
 static void write_campaigns(const fs::path &out, const CampaignDaily &daily,
                             const std::vector<std::pair<SV, SV>> &campaigns) {
@@ -582,13 +819,8 @@ static int run() {
         I64 lo = manifest_time("window_start"), hi = manifest_time("window_end");
         if (lo == BAD || hi == BAD || lo >= hi)
             throw std::runtime_error("invalid manifest window");
-        People people;
-        for (SV file : inputs.directory(data / "links"))
-            rows<2>(file, true, [&](auto &r) {
-                if (!r[0].empty() && !r[1].empty())
-                    people.join(r[0], r[1]);
-            });
-        people.freeze();
+        Identity people;
+        people.build(chunks(inputs.directory(data / "links")), threads);
         std::vector<SV> categories{"unknown"};
         Map<uint32_t> cat_ids{{"unknown", 0}}, products;
         rows<2>(inputs.file(data / "products.csv"), true, [&](auto &r) {
@@ -608,7 +840,7 @@ static int run() {
         timing("setup");
         std::vector<Partitions<RawEvent>> parsed(threads);
         parallel(event_jobs.size(), threads, [&](size_t job, size_t worker) {
-            rows<7>(event_jobs[job], false, [&](auto &r) {
+            fast_rows<7>(event_jobs[job], [&](auto &r) {
                 if (r[0].empty())
                     return;
                 Event event{{}, BAD, 0, 0};
@@ -646,21 +878,22 @@ static int run() {
                 count += p[shard].size();
             DedupTable<RawEvent> unique(count);
             for (auto &p : parsed)
-                for (auto &r : p[shard]) {
+                p[shard].each([&](const RawEvent &r) {
                     auto &old = unique.slot(r, r.hash);
                     if (!old || r.ingest < old->ingest)
                         old = &r;
-                }
+                });
             unique.each([&](auto *r) {
                 if (r->event.ts != BAD)
-                    event_parts[shard][Hash{}(r->event.person) & (SHARDS - 1)].push_back(r->event);
+                    event_parts[shard][r->event.person.hash & (SHARDS - 1)].push_back(r->event);
             });
         });
         parsed.clear();
+        parsed.shrink_to_fit();
         timing("dedup_events");
         std::vector<Partitions<Click>> parsed_clicks(threads);
         parallel(click_jobs.size(), threads, [&](size_t job, size_t worker) {
-            rows<4>(click_jobs[job], false, [&](auto &r) {
+            fast_rows<4>(click_jobs[job], [&](auto &r) {
                 if (r[0].empty() || r[1].empty())
                     return;
                 auto c = campaign_ids.find(r[2]);
@@ -681,13 +914,13 @@ static int run() {
                 count += p[shard].size();
             DedupTable<Click> unique(count);
             for (auto &p : parsed_clicks)
-                for (auto &r : p[shard])
-                    unique.slot(r, Hash{}(r.id)) = &r;
+                p[shard].each([&](const Click &r) { unique.slot(r, Hash{}(r.id)) = &r; });
             unique.each([&](auto *c) {
-                click_parts[shard][Hash{}(c->person) & (SHARDS - 1)].push_back(*c);
+                click_parts[shard][c->person.hash & (SHARDS - 1)].push_back(*c);
             });
         });
         parsed_clicks.clear();
+        parsed_clicks.shrink_to_fit();
         timing("clicks");
         std::array<std::vector<UserRow>, SHARDS> user_rows;
         std::vector<CampaignAccumulator> campaign_rows;
@@ -696,67 +929,94 @@ static int run() {
             campaign_rows.emplace_back(campaigns.size(), floor_day(lo),
                                        floor_day(hi - 1) - floor_day(lo) + 1, aggregate_workers);
         parallel(SHARDS, threads, [&](size_t shard, size_t worker) {
-            std::vector<CompactEvent> events;
-            std::vector<CompactClick> clicks;
             size_t ne = 0, nc = 0;
             for (size_t s = 0; s < SHARDS; ++s) {
                 ne += event_parts[s][shard].size();
                 nc += click_parts[s][shard].size();
             }
-            events.reserve(ne);
-            clicks.reserve(nc);
-            Map<uint32_t> person_ids;
-            person_ids.reserve(ne / 16 + 1);
-            std::vector<SV> person_names;
-            for (size_t s = 0; s < SHARDS; ++s) {
-                auto &ev = event_parts[s][shard];
-                for (auto &e : ev) {
-                    auto [it, added] = person_ids.emplace(e.person, person_names.size());
-                    if (added)
-                        person_names.push_back(e.person);
-                    events.push_back({e.ts, it->second, e.cents, e.category});
-                }
-                std::vector<Event>().swap(ev);
+            // Intern persons, then group each person's records contiguously with
+            // a counting sort. Output row order is irrelevant; only per-person
+            // time order matters, so just the short runs are sorted.
+            PersonTable people_here(ne / 8 + 16);
+            std::vector<uint32_t> event_person(ne);
+            {
+                size_t k = 0;
+                for (size_t s = 0; s < SHARDS; ++s)
+                    event_parts[s][shard].each(
+                        [&](const Event &e) { event_person[k++] = people_here.intern(e.person); });
             }
-            for (size_t s = 0; s < SHARDS; ++s) {
-                auto &cl = click_parts[s][shard];
-                for (auto &c : cl) {
-                    auto it = person_ids.find(c.person);
-                    if (it != person_ids.end())
-                        clicks.push_back({c.id, c.ts, it->second, c.campaign});
+            size_t np = people_here.size();
+            std::vector<uint32_t> event_start(np + 1), click_start(np + 1);
+            for (auto p : event_person)
+                ++event_start[p + 1];
+            for (size_t p = 0; p < np; ++p)
+                event_start[p + 1] += event_start[p];
+            std::vector<CompactEvent> events(ne);
+            {
+                std::vector<uint32_t> fill(event_start.begin(), event_start.end() - 1);
+                size_t k = 0;
+                for (size_t s = 0; s < SHARDS; ++s) {
+                    auto &ev = event_parts[s][shard];
+                    ev.each([&](const Event &e) {
+                        events[fill[event_person[k++]]++] = {e.ts, e.cents, e.category};
+                    });
+                    ev.release();
                 }
-                std::vector<Click>().swap(cl);
             }
-            std::sort(events.begin(), events.end(), [](auto &a, auto &b) {
-                return a.person != b.person ? a.person < b.person : a.ts < b.ts;
-            });
-            std::sort(clicks.begin(), clicks.end(), [](auto &a, auto &b) {
-                return a.person != b.person ? a.person < b.person
-                                            : (a.ts != b.ts ? a.ts < b.ts : a.id > b.id);
-            });
+            std::vector<uint32_t>().swap(event_person);
+            std::vector<uint32_t> click_person(nc);
+            {
+                size_t k = 0;
+                for (size_t s = 0; s < SHARDS; ++s)
+                    click_parts[s][shard].each([&](const Click &c) {
+                        auto p = people_here.find(c.person);
+                        click_person[k++] = p;
+                        if (p != UINT32_MAX)
+                            ++click_start[p + 1];
+                    });
+            }
+            for (size_t p = 0; p < np; ++p)
+                click_start[p + 1] += click_start[p];
+            std::vector<CompactClick> clicks(click_start[np]);
+            {
+                std::vector<uint32_t> fill(click_start.begin(), click_start.end() - 1);
+                size_t k = 0;
+                for (size_t s = 0; s < SHARDS; ++s) {
+                    auto &cl = click_parts[s][shard];
+                    cl.each([&](const Click &c) {
+                        auto p = click_person[k++];
+                        if (p != UINT32_MAX)
+                            clicks[fill[p]++] = {c.id, c.ts, c.campaign};
+                    });
+                    cl.release();
+                }
+            }
+            std::vector<uint32_t>().swap(click_person);
+            for (size_t p = 0; p < np; ++p) {
+                auto first = events.begin() + event_start[p], last = events.begin() + event_start[p + 1];
+                if (last - first > 1)
+                    std::sort(first, last, [](auto &a, auto &b) { return a.ts < b.ts; });
+                auto cf = clicks.begin() + click_start[p], cl = clicks.begin() + click_start[p + 1];
+                if (cl - cf > 1)
+                    std::sort(cf, cl, [](auto &a, auto &b) {
+                        return a.ts != b.ts ? a.ts < b.ts : a.id > b.id;
+                    });
+            }
             auto &rows = user_rows[shard];
             auto &daily = campaign_rows[worker];
             std::vector<I64> category_revenue(categories.size());
             std::vector<uint32_t> active_counts(campaigns.size()), positions(campaigns.size()),
                 active;
-            size_t at = 0, ci = 0;
-            while (at < events.size()) {
-                uint32_t person = events[at].person;
-                size_t end = at + 1;
-                while (end < events.size() && events[end].person == person)
-                    ++end;
-                while (ci < clicks.size() && clicks[ci].person < person)
-                    ++ci;
-                size_t ce = ci;
-                while (ce < clicks.size() && clicks[ce].person == person)
-                    ++ce;
+            for (uint32_t person = 0; person < np; ++person) {
+                size_t at = event_start[person], end = event_start[person + 1];
+                size_t ci = click_start[person], ce = click_start[person + 1];
                 for (auto c : active)
                     active_counts[c] = 0;
                 active.clear();
                 size_t left = ci, right = ci;
                 while (at < end) {
                     int32_t day = floor_day(events[at].ts);
-                    UserRow row{person_names[person], day, 0, 0, 0, -1};
+                    UserRow row{people_here.name(person), day, 0, 0, 0, -1};
                     std::fill(category_revenue.begin(), category_revenue.end(), 0);
                     do {
                         I64 start = events[at].ts, previous = start, rev = 0;
@@ -806,18 +1066,32 @@ static int run() {
                             row.category = c;
                     rows.push_back(row);
                 }
-                ci = ce;
             }
         });
         timing("sessionize_aggregate");
         CampaignDaily daily;
         for (auto &part : campaign_rows)
             part.merge_into(daily);
-        parallel(2, std::min<size_t>(threads, 2), [&](size_t i, size_t) {
-            if (i == 0)
-                write_users(out, user_rows, categories);
-            else
+        // Large user tables are split into part files encoded concurrently;
+        // readers take every *.parquet file in the table directory.
+        size_t total_rows = 0;
+        for (auto &part : user_rows)
+            total_rows += part.size();
+        size_t parts = std::max<size_t>(1, std::min(threads, total_rows / 262144));
+        std::vector<size_t> bounds{0};
+        for (size_t s = 0, acc = 0; s < SHARDS; ++s) {
+            acc += user_rows[s].size();
+            if (bounds.size() < parts && acc * parts >= total_rows * bounds.size())
+                bounds.push_back(s + 1);
+        }
+        bounds.resize(parts);
+        bounds.push_back(SHARDS);
+        parallel(parts + 1, std::min(threads, parts + 1), [&](size_t i, size_t) {
+            if (i == parts)
                 write_campaigns(out, daily, campaigns);
+            else
+                write_users(out / "user_daily" / ("part-" + std::to_string(i) + ".parquet"),
+                            user_rows, bounds[i], bounds[i + 1], categories);
         });
         timing("write_parquet");
         I64 n = 0, sessions = 0, events = 0, revenue = 0;
