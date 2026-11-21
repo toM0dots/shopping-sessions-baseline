@@ -4,7 +4,44 @@ Native C++ implementation of the [Shopping Sessions challenge](https://www.joinb
 with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
 The default runner executes the compiled native pipeline and writes both Parquet tables.
 
-## Latest update: faster hashing, lookups and memory reuse
+## Latest update: measured on the official generator's data
+
+All results here use datasets from the official generator: the public 1M set (seed 1) and the
+20M set from the earlier 20M benchmarks (seed 17, 1,921,192,554 bytes). The native output on the
+public set matches the Python reference exactly, with the published totals: 117,038 user rows,
+27,400 campaign rows, 179,366 sessions and 376,461,330 revenue cents. Paired runs against
+`main` (`f296c69`), alternating order, `NCPU=4`, on the 4-vCPU Linux container described below.
+Both complete tables matched in every round:
+
+| Input (official generator) | Rounds | Previous median | Updated median | Runtime reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Public 1M events / 250K clicks | 10 | 0.227 s | **0.195 s** | **14%** |
+| 20M events / 5M clicks, seed 17 | 6 | 4.151 s | **2.842 s** | **32%** |
+
+Peak RSS on 20M fell from 4.33 to 3.62 GiB. Reports: `logs/paired-v6-official-*.json`.
+
+The official data differs from the earlier surrogate in two ways that mattered. About a fifth of
+all fields are quoted, so most lines contain a quote. And most user IDs are linked, so most
+identity lookups hit. The changes, on top of the hashing, lookup and memory-reuse round below:
+
+- **One-pass quoted lines:** the per-chunk splitter now uses `rows()`, which validates quotes while
+  it scans. Before, every line containing a quote was split twice.
+- **IDs held by value (`Key`):** IDs of up to 15 bytes are stored inline, with the length in
+  byte 15; generated IDs have at most 9 bytes. Longer IDs point into the input. Equality is two
+  word compares, and byte-wise order is a big-endian word compare, so identity hits, interning
+  and dedup never read cold input. Identity entries also hold the canonical person, so a hit
+  resolves within one cache line.
+- **Slimmer records:** records carry keys but not hashes (raw events 72 → 56 bytes, events
+  40 → 32, clicks 64 → 48); a key rehashes in a few nanoseconds.
+
+Validation: 36/36 fixtures, SSE2 and scalar builds; 150 reference fuzz cases; 80 more with long
+and mixed-length IDs that cross the inline/pointer boundary; a degenerate-hash build;
+`check_parser_semantics.py`, SIMD and scalar; and exact matches on both official datasets.
+
+Tried and rejected after measuring: exactly sized identity tables (a higher load factor made the
+frequent misses probe longer) and counting quotes per field from bitmasks (neutral at 4 threads).
+
+## Previous update: faster hashing, lookups and memory reuse
 
 Fresh-process paired runs against the previous `main` (`f296c69`), alternating order, `NCPU=4`,
 on the same surrogate inputs and machine as the section below. Both complete tables matched in
