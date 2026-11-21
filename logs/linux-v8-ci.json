@@ -1,0 +1,19 @@
+{
+  "run_id": 44940974903,
+  "job_id": 136957872309,
+  "url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44940974903",
+  "commit": "cbf706e92920373f95f3fb80bc89762bdb1dd887",
+  "conclusion": "success",
+  "checks": [
+    "Parser differential ASan/UBSan: SIMD and scalar",
+    "Key ASan/UBSan: SIMD and scalar",
+    "Production Linux Docker image with GCC PGO",
+    "36/36 fixtures using scorer isolation flags",
+    "6 alternating 20M-event/5M-click paired comparisons; exact output equality"
+  ],
+  "first_attempt": {
+    "run_id": 44940326206,
+    "conclusion": "failure",
+    "reason": "Benchmark cleanup chmod tried to change host-owned mount roots; corrected to process only UID 1000-owned entries. Native build, sanitizers and container fixtures had passed."
+  }
+}

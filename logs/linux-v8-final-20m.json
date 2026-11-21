@@ -1,0 +1,338 @@
+{
+  "schema_version": 2,
+  "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+  "data": "official generator: seed 17, 20M events, 5M clicks",
+  "threads": 4,
+  "baseline_commit": "c330a0494b304029e28d5bae370c6efff6049cb8",
+  "candidate_commit": "cbf706e92920373f95f3fb80bc89762bdb1dd887",
+  "images": {
+    "baseline": {
+      "reference": "shopping-sessions:benchmark-baseline",
+      "id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "os": "linux",
+      "architecture": "amd64",
+      "repo_digests": []
+    },
+    "candidate": {
+      "reference": "shopping-sessions:ci",
+      "id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "os": "linux",
+      "architecture": "amd64",
+      "repo_digests": []
+    }
+  },
+  "docker_server": {
+    "Version": "28.0.4",
+    "Os": "linux",
+    "Arch": "amd64",
+    "KernelVersion": "7.0.0-1017-azure"
+  },
+  "generator_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/generator.zip",
+  "generator_sha256": "13724cadbac5a99d847e27cea911cd2e338ff972b46c2039da87452011bb101e",
+  "input_csv_bytes": 1921192469,
+  "host_cpu_models": [
+    "AMD EPYC 9V45 96-Core Processor"
+  ],
+  "host_logical_cpus": 4,
+  "host_available_cpus": 4,
+  "host_memory_bytes": 16760344576,
+  "container_cpu_limit": 4,
+  "container_memory_limit": "12g",
+  "container_platform": "linux/amd64",
+  "memory_measurement": "Peak process memory not measured; enforced container limits recorded per sample",
+  "timing_scope": {
+    "container_seconds": "Docker State.FinishedAt minus State.StartedAt, parsed at nanosecond precision. Includes native process startup and normal exit; excludes Docker create and host client/inspection/removal/permission cleanup. Uses daemon wall-clock timestamps, not a monotonic or portal timer.",
+    "wall_seconds": "Host monotonic timer from output/scratch setup through Docker create/start/inspect/remove, permission cleanup and scratch deletion; complete-table comparison and output deletion are excluded."
+  },
+  "method": "Alternating AB/BA pairs; fresh containers and outputs; caches not flushed; all samples retained",
+  "correctness": "Both complete tables matched exactly in all 6 rounds",
+  "notes": "Generated-data Linux CI comparison, not the hidden portal score. Wall times include this harness's inspect/remove calls and are not identical in scope to the older docker_run.sh wall benchmark.",
+  "summary": {
+    "baseline": {
+      "container_seconds": {
+        "min": 1.387508321,
+        "median": 1.460726824,
+        "max": 1.520300431
+      },
+      "wall_seconds": {
+        "min": 1.797475478000024,
+        "median": 1.8596284930000024,
+        "max": 11.438137103999964
+      }
+    },
+    "candidate": {
+      "container_seconds": {
+        "min": 1.356022279,
+        "median": 1.391331404,
+        "max": 1.459254666
+      },
+      "wall_seconds": {
+        "min": 1.7231084730000248,
+        "median": 1.7702420114999882,
+        "max": 1.8351734290000081
+      }
+    }
+  },
+  "runs": [
+    {
+      "wall_seconds": 11.438137103999964,
+      "container_seconds": 1.387508321,
+      "container_started_at": "2026-11-21T19:31:22.91973879Z",
+      "container_finished_at": "2026-11-21T19:31:24.307247111Z",
+      "image_id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0820088 parse=0.519881 dedup_events=0.111086 resolve=0.200986 sessionize_aggregate=0.241874 write_parquet=0.0765796 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.23523}",
+      "round": 1,
+      "implementation": "baseline"
+    },
+    {
+      "wall_seconds": 1.7709863229999883,
+      "container_seconds": 1.356022279,
+      "container_started_at": "2026-11-21T19:31:24.781500742Z",
+      "container_finished_at": "2026-11-21T19:31:26.137523021Z",
+      "image_id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0837538 parse=0.513088 dedup_events=0.108867 resolve=0.199552 sessionize_aggregate=0.202798 write_parquet=0.0700441 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.18098}",
+      "round": 1,
+      "implementation": "candidate"
+    },
+    {
+      "wall_seconds": 1.7231084730000248,
+      "container_seconds": 1.36533399,
+      "container_started_at": "2026-11-21T19:31:27.438716453Z",
+      "container_finished_at": "2026-11-21T19:31:28.804050443Z",
+      "image_id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0844097 parse=0.517142 dedup_events=0.111926 resolve=0.208717 sessionize_aggregate=0.202557 write_parquet=0.0703913 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.19803}",
+      "round": 2,
+      "implementation": "candidate"
+    },
+    {
+      "wall_seconds": 1.8292884409999601,
+      "container_seconds": 1.408336821,
+      "container_started_at": "2026-11-21T19:31:29.154494201Z",
+      "container_finished_at": "2026-11-21T19:31:30.562831022Z",
+      "image_id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0833768 parse=0.521627 dedup_events=0.111912 resolve=0.208492 sessionize_aggregate=0.247105 write_parquet=0.0752132 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.25058}",
+      "round": 2,
+      "implementation": "baseline"
+    },
+    {
+      "wall_seconds": 1.9251320050000231,
+      "container_seconds": 1.520300431,
+      "container_started_at": "2026-11-21T19:31:31.949628999Z",
+      "container_finished_at": "2026-11-21T19:31:33.46992943Z",
+      "image_id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0866117 parse=0.547981 dedup_events=0.136323 resolve=0.234871 sessionize_aggregate=0.250979 write_parquet=0.0739668 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.33363}",
+      "round": 3,
+      "implementation": "baseline"
+    },
+    {
+      "wall_seconds": 1.7343756239999948,
+      "container_seconds": 1.390099417,
+      "container_started_at": "2026-11-21T19:31:33.834434789Z",
+      "container_finished_at": "2026-11-21T19:31:35.224534206Z",
+      "image_id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0833968 parse=0.526997 dedup_events=0.109845 resolve=0.20752 sessionize_aggregate=0.216254 write_parquet=0.0739476 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.22076}",
+      "round": 3,
+      "implementation": "candidate"
+    },
+    {
+      "wall_seconds": 1.8351734290000081,
+      "container_seconds": 1.459254666,
+      "container_started_at": "2026-11-21T19:31:36.502386413Z",
+      "container_finished_at": "2026-11-21T19:31:37.961641079Z",
+      "image_id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0847132 parse=0.525421 dedup_events=0.111435 resolve=0.211184 sessionize_aggregate=0.229508 write_parquet=0.107012 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.27253}",
+      "round": 4,
+      "implementation": "candidate"
+    },
+    {
+      "wall_seconds": 1.827787992000026,
+      "container_seconds": 1.46776909,
+      "container_started_at": "2026-11-21T19:31:38.326327385Z",
+      "container_finished_at": "2026-11-21T19:31:39.794096475Z",
+      "image_id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0851352 parse=0.558748 dedup_events=0.109241 resolve=0.199811 sessionize_aggregate=0.26804 write_parquet=0.077919 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.30178}",
+      "round": 4,
+      "implementation": "baseline"
+    },
+    {
+      "wall_seconds": 1.8899685450000447,
+      "container_seconds": 1.519638347,
+      "container_started_at": "2026-11-21T19:31:41.094943327Z",
+      "container_finished_at": "2026-11-21T19:31:42.614581674Z",
+      "image_id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0880496 parse=0.541667 dedup_events=0.160327 resolve=0.238387 sessionize_aggregate=0.254922 write_parquet=0.076616 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.36289}",
+      "round": 5,
+      "implementation": "baseline"
+    },
+    {
+      "wall_seconds": 1.769497699999988,
+      "container_seconds": 1.411586169,
+      "container_started_at": "2026-11-21T19:31:42.98457752Z",
+      "container_finished_at": "2026-11-21T19:31:44.396163689Z",
+      "image_id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0832881 parse=0.532535 dedup_events=0.114007 resolve=0.210496 sessionize_aggregate=0.2165 write_parquet=0.0743532 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.23416}",
+      "round": 5,
+      "implementation": "candidate"
+    },
+    {
+      "wall_seconds": 1.7849277049999728,
+      "container_seconds": 1.392563391,
+      "container_started_at": "2026-11-21T19:31:45.666661731Z",
+      "container_finished_at": "2026-11-21T19:31:47.059225122Z",
+      "image_id": "sha256:efe9ff0605a72c65dc0215e8a7e36233918c5f6c50366e65554ae1635f510b28",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.0832195 parse=0.534523 dedup_events=0.111226 resolve=0.206339 sessionize_aggregate=0.205484 write_parquet=0.0735097 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.21707}",
+      "round": 6,
+      "implementation": "candidate"
+    },
+    {
+      "wall_seconds": 1.797475478000024,
+      "container_seconds": 1.453684558,
+      "container_started_at": "2026-11-21T19:31:47.448983077Z",
+      "container_finished_at": "2026-11-21T19:31:48.902667635Z",
+      "image_id": "sha256:a1b39e559ba2cdb14b4603d431c42be4a0226b4fc4d68b43654d07fa1a02ff53",
+      "exit_code": 0,
+      "docker_start_exit_code": 0,
+      "oom_killed": false,
+      "container_error": "",
+      "cpu_limit_nanocpus": 4000000000,
+      "memory_limit_bytes": 12884901888,
+      "memory_plus_swap_limit_bytes": 12884901888,
+      "pids_limit": 4096,
+      "stdout": "",
+      "stderr": "setup=0.083721 parse=0.537005 dedup_events=0.111557 resolve=0.206807 sessionize_aggregate=0.260955 write_parquet=0.0782316 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.28109}",
+      "round": 6,
+      "implementation": "baseline"
+    }
+  ],
+  "comparisons": [
+    {
+      "round": 1,
+      "exit_code": 0,
+      "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    },
+    {
+      "round": 2,
+      "exit_code": 0,
+      "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    },
+    {
+      "round": 3,
+      "exit_code": 0,
+      "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    },
+    {
+      "round": 4,
+      "exit_code": 0,
+      "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    },
+    {
+      "round": 5,
+      "exit_code": 0,
+      "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    },
+    {
+      "round": 6,
+      "exit_code": 0,
+      "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+    }
+  ]
+}

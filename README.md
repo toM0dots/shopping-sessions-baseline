@@ -4,7 +4,63 @@ Native C++ implementation of the [Shopping Sessions challenge](https://www.joinb
 with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
 The default runner executes the compiled native pipeline and writes both Parquet tables.
 
-## Latest update: restructured partitioning
+## Latest update: measured against the latest merged code (v8)
+
+On the official generator's **20M events / 5M clicks, seed 17**, six alternating
+fresh-container pairs against `c330a049` gave:
+
+| Linux CI measurement | Previous median | Updated median | Reduction |
+| --- | ---: | ---: | ---: |
+| Container start to exit | 1.461 s | **1.391 s** | **4.8%** |
+| Entire benchmark invocation, including Docker management and cleanup | 1.860 s | **1.770 s** | **4.8%** |
+
+The candidate was faster in all six container pairs; both complete output tables matched
+exactly in every pair. Host: AMD EPYC 9V45, four available CPUs; each container was limited
+to four CPUs and 12 GiB, with the existing GCC profile-guided build used for both versions.
+All samples are retained, including the first baseline's 11.438 s outer-wall outlier.
+Caches were not flushed. This is **not a new portal score**, and these times cannot be
+compared directly with earlier sections' different machines, inputs and baselines.
+
+Changes:
+
+- Pack supported ID characters into six-bit fields, replacing base-36 arithmetic with
+  shifts while preserving exact equality, byte ordering, leading zeros and fallback IDs.
+- Halve normal deduplication table slots from 16 to eight bytes using a fingerprint and
+  bucket index. Full key comparisons still resolve collisions; larger inputs retain a
+  wider-index fallback.
+- Reuse aggregation buffers per worker across partitions and release them before writing
+  Parquet. In this batch, median aggregation time fell from 0.253 s to 0.211 s.
+- Reserve exact Arrow string capacities before appending output IDs and categories.
+
+The benchmark now records Docker's `StartedAt`–`FinishedAt` interval separately from the
+host's monotonic timer around create/start/inspect/remove and permission cleanup. The first
+uses daemon wall-clock timestamps; neither is the portal's timer. The outer interval differs
+from the older `docker_run.sh` benchmark. Image IDs, actual resource limits, raw timings,
+phase diagnostics and all output comparisons are in
+[`logs/linux-v8-final-20m.json`](logs/linux-v8-final-20m.json).
+
+Local macOS/Apple Clang checks (PGO disabled) are retained too: the public 1M median changed
+from 0.401 s to 0.386 s over ten pairs, while 20M was effectively tied/slightly slower,
+3.870 s to 3.912 s over six pairs. See `logs/paired-v8-local-*.json` and
+[`logs/environment-v8.json`](logs/environment-v8.json). The Linux improvement should not be
+assumed to apply equally to every CPU or workload.
+
+Validation: 36/36 fixtures locally and inside the isolated Linux container; exact public
+reference output; five generated datasets at one and eight threads; 80 adversarial cases at
+one and three threads; and a constant-hash build passing all fixtures plus 20 adversarial
+cases. The new `scripts/check_keys.py` runs 82,513 ID cases, 100,000 pair comparisons and 66
+protected-buffer/lifetime checks under ASan/UBSan in each of SIMD and scalar mode. Parser
+sanitizers also passed in Linux CI.
+[Successful build and benchmark](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44940974903).
+
+Reproduce on a Linux Docker host with the checker dependencies installed:
+
+```sh
+docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
+.venv/bin/python scripts/benchmark_linux.py
+```
+
+## Previous update: restructured partitioning
 
 Paired runs against `main` (`f296c69`) on the official generator's datasets, alternating order,
 `NCPU=4`, on the 4-vCPU Linux container described below. Both complete tables matched in every

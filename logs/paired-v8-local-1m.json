@@ -1,0 +1,187 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "data": "dev",
+  "threads": 4,
+  "commands": {
+    "baseline": "build/shopping-sessions-baseline-c330a04",
+    "candidate": "build/experiments/v8-candidate"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 10 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 0.3434435189992655,
+      "median_seconds": 0.4013238565003121,
+      "max_seconds": 0.42691233000005013,
+      "peak_rss_bytes": 218091520
+    },
+    "candidate": {
+      "min_seconds": 0.3629886959988653,
+      "median_seconds": 0.38592575100028625,
+      "max_seconds": 0.5871626129992364,
+      "peak_rss_bytes": 218198016
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 0.3899231810009951,
+      "peak_rss_bytes": 216342528,
+      "exit_code": 0,
+      "stderr": "setup=0.0444369 parse=0.0866526 dedup_events=0.00991629 resolve=0.0359316 sessionize_aggregate=0.064992 write_parquet=0.0396872 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.282199}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 0.3801825809987349,
+      "peak_rss_bytes": 215576576,
+      "exit_code": 0,
+      "stderr": "setup=0.0414844 parse=0.08552 dedup_events=0.0108517 resolve=0.0353261 sessionize_aggregate=0.0613784 write_parquet=0.0415076 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.276816}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 0.4716107139993255,
+      "peak_rss_bytes": 215805952,
+      "exit_code": 0,
+      "stderr": "setup=0.0408994 parse=0.12153 dedup_events=0.0106833 resolve=0.0333605 sessionize_aggregate=0.0585226 write_parquet=0.105078 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.370753}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 0.39304266500039375,
+      "peak_rss_bytes": 213463040,
+      "exit_code": 0,
+      "stderr": "setup=0.0442269 parse=0.0861919 dedup_events=0.0107623 resolve=0.0356601 sessionize_aggregate=0.0692692 write_parquet=0.0389191 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.285636}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 0.42691233000005013,
+      "peak_rss_bytes": 214126592,
+      "exit_code": 0,
+      "stderr": "setup=0.0437197 parse=0.0940065 dedup_events=0.0134241 resolve=0.0393387 sessionize_aggregate=0.0709466 write_parquet=0.0492185 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.311371}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 0.3859328529997583,
+      "peak_rss_bytes": 218198016,
+      "exit_code": 0,
+      "stderr": "setup=0.0411129 parse=0.0900281 dedup_events=0.0109864 resolve=0.0334502 sessionize_aggregate=0.0550382 write_parquet=0.0417015 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.273016}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 0.5871626129992364,
+      "peak_rss_bytes": 212090880,
+      "exit_code": 0,
+      "stderr": "setup=0.155616 parse=0.113894 dedup_events=0.0127411 resolve=0.0463611 sessionize_aggregate=0.0877583 write_parquet=0.0526404 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.469866}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 0.40648790600062057,
+      "peak_rss_bytes": 217640960,
+      "exit_code": 0,
+      "stderr": "setup=0.0419029 parse=0.0902908 dedup_events=0.0115642 resolve=0.0351186 sessionize_aggregate=0.0608646 write_parquet=0.0419592 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.282324}"
+    },
+    {
+      "round": 5,
+      "implementation": "baseline",
+      "wall_seconds": 0.3954830080001557,
+      "peak_rss_bytes": 214102016,
+      "exit_code": 0,
+      "stderr": "setup=0.039662 parse=0.0823709 dedup_events=0.0120949 resolve=0.0353106 sessionize_aggregate=0.0756428 write_parquet=0.0477289 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.293932}"
+    },
+    {
+      "round": 5,
+      "implementation": "candidate",
+      "wall_seconds": 0.3961804709997523,
+      "peak_rss_bytes": 215285760,
+      "exit_code": 0,
+      "stderr": "setup=0.0440597 parse=0.0853011 dedup_events=0.0102105 resolve=0.0352028 sessionize_aggregate=0.0641718 write_parquet=0.044916 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.284516}"
+    },
+    {
+      "round": 6,
+      "implementation": "candidate",
+      "wall_seconds": 0.43453332600074646,
+      "peak_rss_bytes": 216551424,
+      "exit_code": 0,
+      "stderr": "setup=0.0544772 parse=0.103327 dedup_events=0.0122361 resolve=0.0384294 sessionize_aggregate=0.068156 write_parquet=0.0420257 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.319291}"
+    },
+    {
+      "round": 6,
+      "implementation": "baseline",
+      "wall_seconds": 0.39729179800087877,
+      "peak_rss_bytes": 218091520,
+      "exit_code": 0,
+      "stderr": "setup=0.047662 parse=0.0900868 dedup_events=0.0123947 resolve=0.0349554 sessionize_aggregate=0.0629412 write_parquet=0.0409637 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.289716}"
+    },
+    {
+      "round": 7,
+      "implementation": "baseline",
+      "wall_seconds": 0.42322360500111245,
+      "peak_rss_bytes": 215199744,
+      "exit_code": 0,
+      "stderr": "setup=0.0446132 parse=0.100325 dedup_events=0.0127883 resolve=0.0387555 sessionize_aggregate=0.0744044 write_parquet=0.0450608 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.316823}"
+    },
+    {
+      "round": 7,
+      "implementation": "candidate",
+      "wall_seconds": 0.38427558900002623,
+      "peak_rss_bytes": 216317952,
+      "exit_code": 0,
+      "stderr": "setup=0.0396294 parse=0.0899417 dedup_events=0.0125902 resolve=0.0376092 sessionize_aggregate=0.0570707 write_parquet=0.0391955 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.27661}"
+    },
+    {
+      "round": 8,
+      "implementation": "candidate",
+      "wall_seconds": 0.3629886959988653,
+      "peak_rss_bytes": 213987328,
+      "exit_code": 0,
+      "stderr": "setup=0.0355484 parse=0.0842727 dedup_events=0.0109591 resolve=0.0364518 sessionize_aggregate=0.0605725 write_parquet=0.0389889 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.267375}"
+    },
+    {
+      "round": 8,
+      "implementation": "baseline",
+      "wall_seconds": 0.40535591499974544,
+      "peak_rss_bytes": 213942272,
+      "exit_code": 0,
+      "stderr": "setup=0.0387589 parse=0.0862369 dedup_events=0.0114144 resolve=0.0367246 sessionize_aggregate=0.0752284 write_parquet=0.0424718 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.29162}"
+    },
+    {
+      "round": 9,
+      "implementation": "baseline",
+      "wall_seconds": 0.42208533600023657,
+      "peak_rss_bytes": 214351872,
+      "exit_code": 0,
+      "stderr": "setup=0.052467 parse=0.100838 dedup_events=0.0121883 resolve=0.0357 sessionize_aggregate=0.0676547 write_parquet=0.0457854 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.315218}"
+    },
+    {
+      "round": 9,
+      "implementation": "candidate",
+      "wall_seconds": 0.3859186490008142,
+      "peak_rss_bytes": 216707072,
+      "exit_code": 0,
+      "stderr": "setup=0.0425858 parse=0.0886678 dedup_events=0.0123997 resolve=0.0355983 sessionize_aggregate=0.0648431 write_parquet=0.0383177 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.283107}"
+    },
+    {
+      "round": 10,
+      "implementation": "candidate",
+      "wall_seconds": 0.36768633200154,
+      "peak_rss_bytes": 216805376,
+      "exit_code": 0,
+      "stderr": "setup=0.0461866 parse=0.0793614 dedup_events=0.0100388 resolve=0.0323351 sessionize_aggregate=0.0600426 write_parquet=0.0365116 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.265053}"
+    },
+    {
+      "round": 10,
+      "implementation": "baseline",
+      "wall_seconds": 0.3434435189992655,
+      "peak_rss_bytes": 214859776,
+      "exit_code": 0,
+      "stderr": "setup=0.0352688 parse=0.0734697 dedup_events=0.0103318 resolve=0.0324768 sessionize_aggregate=0.0607503 write_parquet=0.0376406 \n{\"user_rows\":117038,\"campaign_rows\":27400,\"sessions\":179366,\"events\":977930,\"revenue_cents\":376461330,\"elapsed_seconds\":0.250504}"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-21",
+  "os": "15.2",
+  "cpu": "Intel Core i5-1038NG7 @ 2.00GHz",
+  "physical_cores": 4,
+  "logical_cpus": 8,
+  "memory_bytes": 17179869184,
+  "python": "3.11.7",
+  "duckdb": "1.4.5",
+  "pyarrow": "19.0.1",
+  "polars": "1.38.1",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.3)",
+  "public_input_sha256_paths_and_bytes": "cb10a0509824f7500edb7289f8a5c7534da6a72610c7997501b13d314fbeea00",
+  "generator_seed": 1,
+  "requested_events": 1000000,
+  "requested_clicks": 250000,
+  "input_csv_bytes": 96210343,
+  "notes": "Local macOS paired comparison against latest merged c330a049. Fresh processes/outputs, alternating order, no cache flushes or discarded samples. No concurrent agent compilation/tests during timing. Linux CI is a separate environment; neither measures the portal score.",
+  "baseline_commit": "c330a0494b304029e28d5bae370c6efff6049cb8",
+  "arrow_linkage": "minimal static Arrow/Parquet 19.0.1; OS and C++ runtime libraries remain dynamic",
+  "arrow_source_archive_sha256": "4c898504958841cc86b6f8710ecb2919f96b5e10fa8989ac10ac4fca8362d86a",
+  "native_source_sha256": "6eb618770057a68761e0afb497cf48b1f76f5f4c0933496b3a70a306846f61e6",
+  "native_binary_sha256": "2380032ec780d09118037b036eeb8ca03381bcc32f507ee8bd81d44f96a65bff",
+  "baseline_binary_sha256": "7e8664f3134b268d5588865a412d46836b7a00c1a2ff38d515aff375a0fa4edd",
+  "scale_input": {
+    "seed": 17,
+    "requested_events": 20000000,
+    "requested_clicks": 5000000,
+    "csv_bytes": 1921192469,
+    "output_user_rows": 2249563,
+    "output_campaign_rows": 28014,
+    "surviving_events": 19674814,
+    "sessions": 3416486,
+    "revenue_cents": 6029421427
+  },
+  "candidate_commit": "4e962193c0ca381a447f116ef86b0a00d54376e2",
+  "pgo": "OFF locally (Apple Clang); Docker CI uses existing GCC PGO for both versions",
+  "key_validation": {
+    "commands": [
+      "python3 scripts/check_keys.py",
+      "python3 scripts/check_keys.py --scalar"
+    ],
+    "cases_each": 82513,
+    "pair_comparisons_each": 100000,
+    "guarded_buffer_lifetime_cases_each": 66,
+    "sanitizers": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer"
+    ]
+  },
+  "benchmark_harness_commit": "cbf706e92920373f95f3fb80bc89762bdb1dd887"
+}

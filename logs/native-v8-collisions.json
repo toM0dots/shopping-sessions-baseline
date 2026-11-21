@@ -1,0 +1,13 @@
+{
+  "production_source_sha256": "6eb618770057a68761e0afb497cf48b1f76f5f4c0933496b3a70a306846f61e6",
+  "variant_source_sha256": "da339368ad99e9772ecb32cd045dd3d4fa289f4675057f4efb96bdaf80585628",
+  "mutation": "Key::hash() always returns zero; production file unmodified",
+  "production_source_still_matches_snapshot": true,
+  "fixture_result": "36/36 fixtures passed",
+  "fuzz_result": "20 cases, 0 failures",
+  "fuzz_worker_counts": [
+    1,
+    3
+  ],
+  "fuzz_comparisons": 40
+}
