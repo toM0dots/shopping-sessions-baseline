@@ -4,6 +4,9 @@ use crate::sys::*;
 use crate::*;
 use std::sync::atomic::Ordering;
 
+#[path = "input_release.rs"]
+mod input_release;
+
 pub const CHUNK: usize = 4096;
 pub const LINK_OFF: usize = 4032;
 const BLOCK: usize = 2 << 20;
@@ -1943,6 +1946,39 @@ fn work_queue_build(g: &G) -> Vec<Chunk> {
     }
 }
 
+fn input_release_batches(chunks: usize) -> Option<&'static input_release::Batches> {
+    static SIZE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    static BATCHES: std::sync::OnceLock<input_release::Batches> = std::sync::OnceLock::new();
+    // Size 1 preserves the existing per-chunk mmap release behavior, including
+    // its pread path. Size 8 is an opt-in tuning candidate. Bound user overrides
+    // so a malformed setting cannot retain an arbitrarily large input batch.
+    let size = *SIZE.get_or_init(|| std::env::var("XL_REL_BATCH").ok()
+        .and_then(|value| value.trim().parse::<usize>().ok()).unwrap_or(1).clamp(1, 64));
+    if size == 1 || !unsafe { RELEASE } {
+        None
+    } else {
+        Some(BATCHES.get_or_init(|| input_release::Batches::new(chunks, size)))
+    }
+}
+
+fn input_chunk_complete(g: &G, queue: &[Chunk], index: usize, batches: &input_release::Batches) {
+    if let Some(completed) = batches.complete(index) {
+        let ranges = queue[completed].iter().map(|chunk| {
+            let file = &g.files[chunk.file as usize];
+            input_release::InputRange {
+                file: chunk.file,
+                start: file.off + chunk.a,
+                end: file.off + chunk.b.min(file.len),
+            }
+        });
+        input_release::whole_pages(ranges, |start, len| {
+            // These are read-only, file-backed input pages only. Their virtual
+            // mappings survive, so later raw-ID lookups can fault them back in.
+            unsafe { madvise(g.region.add(start) as *mut u8, len, MADV_DONTNEED) };
+        });
+    }
+}
+
 #[inline(always)]
 fn parse_buf(g: &G, t: &mut TState, eb: &mut EvBatch, cb: &mut CkBatch, out: &mut Out, tb: &'static Tabs, tid: usize, f: &FileInfo, buf: &[u8], s: usize) {
     let mut ctx = Ctx { g, t, eb, cb, out, tabs: tb, tid: tid as u64, base: (f.off + s) as u64, fend: (f.off + f.len) as u64 };
@@ -2067,6 +2103,7 @@ pub fn stage1(g: &G, tid: usize) {
     let use_rd = rd > 0 && fds.len() == g.files.len() && unsafe { SKIP } & 512 == 0;
     let rb = if use_rd { unsafe { anon(rd + 8192).add(4096) } } else { std::ptr::null_mut() };
     let (q, nckl) = work_queue(g);
+    let release_batches = input_release_batches(q.len());
     let nckl = *nckl;
     let inq = d.st2q;
     let mut us_open = true;
@@ -2108,12 +2145,18 @@ pub fn stage1(g: &G, tid: usize) {
         let f = &g.files[c.file as usize];
         if use_rd && fds[c.file as usize] >= 0 {
             unsafe { chunk_rd(g, &mut *t, &mut eb, &mut cb, &mut out, tb, tid, f, &c, fds[c.file as usize], rb, rd) };
+            if let Some(batches) = release_batches {
+                input_chunk_complete(g, q, i, batches);
+            }
             continue;
         }
         let data = unsafe { std::slice::from_raw_parts(g.region.add(f.off), f.len) };
         let s = if c.a == f.hdr { c.a } else { next_line_start(data, c.a - 1) };
         let e = if c.b >= f.len { f.len } else { next_line_start(data, c.b - 1) };
         if s >= e {
+            if let Some(batches) = release_batches {
+                input_chunk_complete(g, q, i, batches);
+            }
             continue;
         }
         let buf = &data[s..e];
@@ -2128,7 +2171,9 @@ pub fn stage1(g: &G, tid: usize) {
         } else {
             parse_buf(g, &mut *t, &mut eb, &mut cb, &mut out, tb, tid, f, buf, s);
         }
-        if unsafe { RELEASE } {
+        if let Some(batches) = release_batches {
+            input_chunk_complete(g, q, i, batches);
+        } else if unsafe { RELEASE } {
             let a = (f.off + s + 4095) & !4095;
             let b = (f.off + e) & !4095;
             if b > a {
