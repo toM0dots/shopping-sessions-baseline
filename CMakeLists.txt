@@ -15,3 +15,14 @@ elseif(UNIX)
   target_compile_options(shopping-sessions PRIVATE -ffunction-sections -fdata-sections)
   target_link_options(shopping-sessions PRIVATE -Wl,--gc-sections)
 endif()
+# Profile-guided optimization: configure with PGO=generate, run the binary on
+# training data (it writes .gcda profiles next to its object files), then
+# reconfigure the same build directory with PGO=use and rebuild.
+set(PGO "OFF" CACHE STRING "Profile-guided optimization: OFF, generate or use")
+if(PGO STREQUAL "generate")
+  target_compile_options(shopping-sessions PRIVATE -fprofile-generate -fprofile-update=atomic)
+  target_link_options(shopping-sessions PRIVATE -fprofile-generate)
+elseif(PGO STREQUAL "use")
+  target_compile_options(shopping-sessions PRIVATE -fprofile-use -fprofile-correction -Wno-missing-profile
+                         -Wno-error=coverage-mismatch)
+endif()
