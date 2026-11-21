@@ -37,28 +37,166 @@ constexpr I64 DAY = 86400000, REACH = 7 * DAY;
 constexpr I64 BAD = std::numeric_limits<I64>::min();
 constexpr size_t SHARDS = 64;
 
-static uint64_t mix(uint64_t h) {
-    h ^= h >> 30;
-    h *= 0xbf58476d1ce4e5b9ULL;
-    h ^= h >> 27;
-    h *= 0x94d049bb133111ebULL;
-    return h ^ (h >> 31);
+// wyhash-style string hash: one 64x64->128-bit multiply per 16 bytes, with
+// overlapping loads for short keys. Values only choose shards and table slots;
+// every table still compares full keys, so outputs never depend on them.
+static inline uint64_t mum(uint64_t a, uint64_t b) {
+    __uint128_t r = static_cast<__uint128_t>(a) * b;
+    return uint64_t(r) ^ uint64_t(r >> 64);
+}
+static inline uint64_t load8(const char *p) {
+    uint64_t v;
+    std::memcpy(&v, p, 8);
+    return v;
+}
+static inline uint64_t load4(const char *p) {
+    uint32_t v;
+    std::memcpy(&v, p, 4);
+    return v;
 }
 struct Hash {
     size_t operator()(SV s) const {
-        uint64_t h = s.size(), v;
-        while (s.size() >= 8) {
-            std::memcpy(&v, s.data(), 8);
-            h = mix(h ^ v);
-            s.remove_prefix(8);
+        constexpr uint64_t k0 = 0xa0761d6478bd642fULL, k1 = 0xe7037ed1a0b428dbULL,
+                           k2 = 0x8ebc6af09c88c6e3ULL;
+        const char *p = s.data();
+        size_t n = s.size();
+        uint64_t seed = k0 ^ n, a, b;
+        if (n <= 16) {
+            if (n >= 8) {
+                a = load8(p);
+                b = load8(p + n - 8);
+            } else if (n >= 4) {
+                a = load4(p);
+                b = load4(p + n - 4);
+            } else if (n) {
+                a = (uint64_t(uint8_t(p[0])) << 16) | (uint64_t(uint8_t(p[n >> 1])) << 8) |
+                    uint8_t(p[n - 1]);
+                b = 0;
+            } else
+                a = b = 0;
+        } else {
+            size_t left = n;
+            while (left > 16) {
+                seed = mum(load8(p) ^ k1, load8(p + 8) ^ seed);
+                p += 16;
+                left -= 16;
+            }
+            a = load8(p + left - 16);
+            b = load8(p + left - 8);
         }
-        v = 0;
-        if (!s.empty())
-            std::memcpy(&v, s.data(), s.size());
-        return mix(h ^ v);
+        return mum(k1 ^ n, mum(a ^ k1, b ^ seed) ^ k2);
     }
 };
 template <class T> using Map = std::unordered_map<SV, T, Hash>;
+
+// An ID held by value when it has at most 15 bytes (every generated ID has at
+// most 9), else a pointer into the mapped input. Short keys keep their bytes in
+// memory order with the length in byte 15, so equality is two word compares and
+// byte-wise order is a big-endian compare of the two words, with no read of
+// cold input. Long keys fall back to comparing the referenced bytes. Exact both
+// ways: a short and a long key never have the same length.
+static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "Key stores the length in byte 15");
+struct Key {
+    uint64_t lo = 0, hi = 0;
+    static constexpr uint64_t LONG = uint64_t(0xFF) << 56;
+    static Key of(SV s) {
+        Key k;
+        if (s.size() <= 15) {
+            char bytes[16] = {};
+            std::memcpy(bytes, s.data(), s.size());
+            std::memcpy(&k.lo, bytes, 8);
+            std::memcpy(&k.hi, bytes + 8, 8);
+            k.hi |= uint64_t(s.size()) << 56;
+        } else {
+            k.lo = reinterpret_cast<uintptr_t>(s.data());
+            k.hi = LONG | s.size();
+        }
+        return k;
+    }
+    bool is_short() const { return (hi & LONG) != LONG; }
+    bool empty() const { return !lo && !hi; }
+    size_t size() const { return is_short() ? size_t(hi >> 56) : size_t(hi & ~LONG); }
+    // Views a short key's own bytes: valid only while this Key is alive.
+    SV view() const {
+        if (is_short())
+            return SV(reinterpret_cast<const char *>(this), size_t(hi >> 56));
+        return SV(reinterpret_cast<const char *>(uintptr_t(lo)), size_t(hi & ~LONG));
+    }
+    bool operator==(const Key &o) const {
+        if (lo == o.lo && hi == o.hi)
+            return true;
+        return !is_short() && !o.is_short() && view() == o.view();
+    }
+    bool operator!=(const Key &o) const { return !(*this == o); }
+    bool operator<(const Key &o) const {
+        if (is_short() && o.is_short()) {
+            uint64_t a = __builtin_bswap64(lo), b = __builtin_bswap64(o.lo);
+            return a != b ? a < b : __builtin_bswap64(hi) < __builtin_bswap64(o.hi);
+        }
+        return view() < o.view();
+    }
+    uint64_t hash() const {
+        if (!is_short())
+            return Hash{}(view());
+        uint64_t h = mum(lo ^ 0xe7037ed1a0b428dbULL, hi ^ 0x8ebc6af09c88c6e3ULL);
+        return mum(h ^ 0xa0761d6478bd642fULL, 0x589965cc75374cc3ULL);
+    }
+};
+
+// Read-only copy of a small string map for per-row lookups: one contiguous,
+// cache-resident probe sequence instead of a modulo and a node chain. An
+// occupied flag (not an empty key) marks slots, since an empty ID is valid.
+class FlatIds {
+    struct Entry {
+        SV key;
+        uint32_t tag = 0, value = UINT32_MAX;
+    };
+    std::vector<Entry> entries;
+    size_t mask = 0;
+
+  public:
+    explicit FlatIds(const Map<uint32_t> &map) {
+        size_t cap = 16;
+        while (cap / 2 < map.size())
+            cap *= 2;
+        entries.resize(cap);
+        mask = cap - 1;
+        for (auto &[key, value] : map) {
+            uint64_t hash = Hash{}(key);
+            size_t i = hash & mask;
+            while (entries[i].value != UINT32_MAX)
+                i = (i + 1) & mask;
+            entries[i] = {key, uint32_t(hash >> 32), value};
+        }
+    }
+    const uint32_t *find(SV key) const {
+        uint64_t hash = Hash{}(key);
+        uint32_t tag = uint32_t(hash >> 32);
+        for (size_t i = hash & mask;; i = (i + 1) & mask) {
+            auto &e = entries[i];
+            if (e.value == UINT32_MAX)
+                return nullptr;
+            if (e.tag == tag && e.key == key)
+                return &e.value;
+        }
+    }
+};
+
+// Visits a list in order, calling prefetch on each element a fixed distance
+// before f, so random accesses that f makes have already been requested.
+template <size_t Ahead = 16, class List, class P, class F> void each_ahead(const List &list, P prefetch, F f) {
+    using Row = std::remove_reference_t<decltype(*list.first())>;
+    std::array<const Row *, Ahead> ring;
+    size_t n = 0;
+    list.each([&](const Row &r) {
+        prefetch(r);
+        if (n >= Ahead)
+            f(*ring[n % Ahead]);
+        ring[n++ % Ahead] = &r;
+    });
+    for (size_t k = n > Ahead ? n - Ahead : 0; k < n; ++k)
+        f(*ring[k % Ahead]);
+}
 
 // Input records own the key views. Keep just a fingerprint and winning record
 // pointer in each slot, and compare the full ID whenever fingerprints match.
@@ -102,17 +240,7 @@ template <class Row> class DedupTable {
     }
     // Inserts rows in order, prefetching each slot a few rows in advance.
     template <class List, class F> void insert_all(const List &list, F f) {
-        constexpr size_t ahead = 16;
-        std::array<const Row *, ahead> ring;
-        size_t n = 0;
-        list.each([&](const Row &r) {
-            prefetch(r.hash);
-            if (n >= ahead)
-                f(*ring[n % ahead]);
-            ring[n++ % ahead] = &r;
-        });
-        for (size_t k = n > ahead ? n - ahead : 0; k < n; ++k)
-            f(*ring[k % ahead]);
+        each_ahead(list, [&](const Row &r) { prefetch(r.id.hash()); }, f);
     }
 };
 
@@ -279,62 +407,16 @@ template <size_t N, class F> void rows(SV text, bool header, F f) {
 // SSE2 bitmasks; any line that contains a quote is handed to rows<N>, which
 // applies the exact quoting rules. Other lines need exactly N - 1 commas.
 template <size_t N, class F> void fast_rows(SV text, F f) {
-    const char *p = text.data(), *end = p + text.size(), *line = p, *field = p;
-    std::array<SV, N> fields;
-    size_t commas = 0;
-    bool quoted = false;
-    auto special = [&](const char *q) {
-        char c = *q;
-        if (c == ',') {
-            if (commas < N)
-                fields[commas] = SV(field, q - field);
-            ++commas;
-            field = q + 1;
-        } else if (c == '"') {
-            quoted = true;
-        } else {
-            if (quoted)
-                rows<N>(SV(line, q - line), false, f);
-            else if (commas == N - 1) {
-                fields[N - 1] = SV(field, q - field);
-                f(fields);
-            }
-            line = field = q + 1;
-            commas = 0;
-            quoted = false;
-        }
-    };
-#if defined(__SSE2__)
-    const __m128i comma = _mm_set1_epi8(','), quote = _mm_set1_epi8('"'), lf = _mm_set1_epi8('\n');
-    for (; end - p >= 16; p += 16) {
-        __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i *>(p));
-        unsigned mask = unsigned(_mm_movemask_epi8(_mm_or_si128(
-            _mm_or_si128(_mm_cmpeq_epi8(v, comma), _mm_cmpeq_epi8(v, quote)), _mm_cmpeq_epi8(v, lf))));
-        while (mask) {
-            special(p + __builtin_ctz(mask));
-            mask &= mask - 1;
-        }
-    }
-#endif
-    for (; p < end; ++p)
-        if (*p == ',' || *p == '"' || *p == '\n')
-            special(p);
-    if (line < end) {
-        // A final record without a trailing LF.
-        if (quoted)
-            rows<N>(SV(line, end - line), false, f);
-        else if (commas == N - 1) {
-            fields[N - 1] = SV(field, end - field);
-            f(fields);
-        }
-    }
+    // Generated inputs quote about a fifth of all fields, so most lines hold a
+    // quote. rows() validates quotes while it scans, in the same single pass.
+    rows<N>(text, false, f);
 }
 // Buffers a few split rows so the caller can start fetching each row's
 // random-access lookups before processing the first of them.
 template <size_t N, class P, class F> void batched_rows(SV text, P prefetch, F f) {
     constexpr size_t batch = 16;
     std::array<std::array<SV, N>, batch> rows_buffer;
-    std::array<uint64_t, batch> keys;
+    std::array<decltype(prefetch(rows_buffer[0])), batch> keys;
     size_t n = 0;
     auto flush = [&] {
         for (size_t i = 0; i < n; ++i)
@@ -470,28 +552,36 @@ template <class F> void parallel(size_t jobs, size_t threads, F f) {
     if (failure)
         std::rethrow_exception(failure);
 }
-static std::vector<SV> chunks(const std::vector<SV> &files) {
-    std::vector<SV> jobs;
-    for (SV text : files) {
-        auto p = text.find('\n');
-        if (p == SV::npos)
-            continue;
-        text.remove_prefix(p + 1);
-        while (!text.empty()) {
-            size_t n = std::min<size_t>(text.size(), 1 << 20);
-            if (n < text.size()) {
-                auto end = text.find('\n', n);
-                n = end == SV::npos ? text.size() : end + 1;
-            }
-            jobs.push_back(text.substr(0, n));
-            text.remove_prefix(n);
-        }
+// A nominal byte range of one input file. Boundaries are resolved by the
+// worker that parses it, so no input is touched serially beforehand (on cold
+// storage, each touch is a blocking read). A record belongs to the range that
+// holds its first byte; the header is the record at offset 0 and is skipped.
+struct Chunk {
+    SV file;
+    size_t begin, end;
+    SV resolve() const {
+        auto line_start = [&](size_t at) {
+            // The first record start at or after `at` (at > 0).
+            if (at >= file.size())
+                return file.size();
+            auto p = file.find('\n', at - 1);
+            return p == SV::npos ? file.size() : p + 1;
+        };
+        size_t first = line_start(begin ? begin : 1), last = line_start(end);
+        return first < last ? file.substr(first, last - first) : SV();
     }
+};
+static std::vector<Chunk> chunks(const std::vector<SV> &files) {
+    constexpr size_t size = 1 << 20;
+    std::vector<Chunk> jobs;
+    for (SV text : files)
+        for (size_t at = 0; at < text.size(); at += size)
+            jobs.push_back({text, at, std::min(text.size(), at + size)});
     return jobs;
 }
 // A person name together with its hash, so later phases never rehash cold input.
 struct PersonRef {
-    SV name;
+    Key name;
     uint64_t hash;
 };
 
@@ -499,12 +589,14 @@ struct PersonRef {
 // hash-sharded tables in parallel, and union-find then runs on dense integers.
 // Afterwards every table is read-only and serves identity queries directly.
 class Identity {
+    // While building, canon.lo holds the ID's dense index; afterwards canon is
+    // the person's canonical ID, so a hit resolves within this one entry. Empty
+    // keys never occur (links with an empty side are dropped) and mark free slots.
     struct Entry {
-        SV key;
-        uint32_t tag = 0, canon = 0;
+        Key key, canon;
     };
     struct Ref {
-        SV key;
+        Key key;
         uint64_t hash;
         uint32_t slot; // 2 * pair index + side, relative to its job
     };
@@ -514,23 +606,23 @@ class Identity {
         uint32_t base = 0;
     };
     std::array<Shard, SHARDS> shards;
-    std::vector<SV> names;
-    std::vector<uint64_t> hashes;
+    std::vector<Key> names;
     static size_t index(uint64_t hash, size_t mask) { return (hash / SHARDS) & mask; }
 
   public:
-    void build(const std::vector<SV> &jobs, size_t threads) {
+    void build(const std::vector<Chunk> &jobs, size_t threads) {
         // Pass 1: parse each chunk and bucket its ID references by shard.
         std::vector<std::array<std::vector<Ref>, SHARDS>> refs(jobs.size());
         std::vector<uint32_t> pairs(jobs.size() + 1);
         parallel(jobs.size(), threads, [&](size_t job, size_t) {
             uint32_t n = 0;
-            fast_rows<2>(jobs[job], [&](auto &r) {
+            fast_rows<2>(jobs[job].resolve(), [&](auto &r) {
                 if (r[0].empty() || r[1].empty())
                     return;
                 for (int side = 0; side < 2; ++side) {
-                    uint64_t hash = Hash{}(r[side]);
-                    refs[job][hash & (SHARDS - 1)].push_back({r[side], hash, 2 * n + side});
+                    Key key = Key::of(r[side]);
+                    uint64_t hash = key.hash();
+                    refs[job][hash & (SHARDS - 1)].push_back({key, hash, 2 * n + side});
                 }
                 ++n;
             });
@@ -540,8 +632,7 @@ class Identity {
             pairs[j + 1] += pairs[j];
         // Pass 2: intern each shard independently. Sides receive (shard, local ID).
         std::vector<uint64_t> sides(size_t(pairs.back()) * 2);
-        std::array<std::vector<SV>, SHARDS> local_names;
-        std::array<std::vector<uint64_t>, SHARDS> local_hashes;
+        std::array<std::vector<Key>, SHARDS> local_names;
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             size_t count = 0;
             for (auto &job : refs)
@@ -553,21 +644,18 @@ class Identity {
             sh.table.assign(cap, {});
             sh.mask = cap - 1;
             auto &nm = local_names[shard];
-            auto &hs = local_hashes[shard];
             for (size_t j = 0; j < refs.size(); ++j) {
                 for (auto &r : refs[j][shard]) {
-                    uint32_t tag = uint32_t(r.hash >> 32);
                     size_t i = index(r.hash, sh.mask);
-                    while (!sh.table[i].key.empty() &&
-                           (sh.table[i].tag != tag || sh.table[i].key != r.key))
+                    while (!sh.table[i].key.empty() && sh.table[i].key != r.key)
                         i = (i + 1) & sh.mask;
                     auto &e = sh.table[i];
                     if (e.key.empty()) {
-                        e = {r.key, tag, uint32_t(nm.size())};
+                        e.key = r.key;
+                        e.canon.lo = nm.size();
                         nm.push_back(r.key);
-                        hs.push_back(r.hash);
                     }
-                    sides[size_t(pairs[j]) * 2 + r.slot] = uint64_t(shard) << 32 | e.canon;
+                    sides[size_t(pairs[j]) * 2 + r.slot] = uint64_t(shard) << 32 | e.canon.lo;
                 }
                 std::vector<Ref>().swap(refs[j][shard]);
             }
@@ -579,14 +667,12 @@ class Identity {
             total += local_names[s].size();
         }
         names.resize(total);
-        hashes.resize(total);
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             auto base = shards[shard].base;
             std::copy(local_names[shard].begin(), local_names[shard].end(), names.begin() + base);
-            std::copy(local_hashes[shard].begin(), local_hashes[shard].end(), hashes.begin() + base);
             for (auto &e : shards[shard].table)
                 if (!e.key.empty())
-                    e.canon += base;
+                    e.canon.lo += base;
         });
         auto global = [&](uint64_t side) { return shards[side >> 32].base + uint32_t(side); };
         std::vector<uint32_t> parent(total);
@@ -633,49 +719,55 @@ class Identity {
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             for (auto &e : shards[shard].table)
                 if (!e.key.empty())
-                    e.canon = best[parent[e.canon]].load(std::memory_order_relaxed);
+                    e.canon = names[best[parent[uint32_t(e.canon.lo)]].load(std::memory_order_relaxed)];
         });
+        std::vector<Key>().swap(names);
     }
     void prefetch(uint64_t hash) const {
         auto &sh = shards[hash & (SHARDS - 1)];
         if (!sh.table.empty())
             __builtin_prefetch(&sh.table[index(hash, sh.mask)]);
     }
-    PersonRef person(SV s) const { return person(s, Hash{}(s)); }
-    PersonRef person(SV s, uint64_t hash) const {
+    // The person's canonical ID: the smallest linked ID, or the ID itself.
+    const Key &canonical(const Key &id, uint64_t hash) const {
         auto &sh = shards[hash & (SHARDS - 1)];
         if (sh.table.empty())
-            return {s, hash};
-        uint32_t tag = uint32_t(hash >> 32);
+            return id;
         for (size_t i = index(hash, sh.mask);; i = (i + 1) & sh.mask) {
             auto &e = sh.table[i];
             if (e.key.empty())
-                return {s, hash};
-            if (e.tag == tag && e.key == s)
-                return {names[e.canon], hashes[e.canon]};
+                return id;
+            if (e.key == id)
+                return e.canon;
         }
     }
 };
 
-struct Event {
-    PersonRef person;
+// Records carry keys but no hashes: a Key rehashes in a few nanoseconds from
+// bytes already in the record, which is cheaper than moving 8 more bytes of
+// every record through memory at each partitioning step.
+// A valid event, stored once in the shard of its user ID. Deduplication
+// tombstones losing copies in place by clearing the user (no stored event has
+// an empty user); identity resolution rewrites the user to its canonical ID.
+struct EventRec {
+    Key user;
     I64 ts;
     int cents;
     uint32_t category;
 };
-struct RawEvent {
-    SV id;
+// Every event row with an ID, valid or not: invalid earliest copies still
+// block later valid ones. `event` is null for an invalid row.
+struct DedupRec {
+    Key id;
     I64 ingest;
-    uint64_t hash;
-    Event event;
+    EventRec *event;
 };
-struct Click {
-    SV id;
-    PersonRef person;
-    uint64_t hash; // of id
+struct ClickRec {
+    Key id, user;
     I64 ts;
     uint32_t campaign;
 };
+static_assert(sizeof(EventRec) == 32 && sizeof(DedupRec) == 32 && sizeof(ClickRec) == 48);
 // After interning, each person's records are grouped by a counting sort and
 // only the short per-person runs are ordered by time.
 struct CompactEvent {
@@ -684,28 +776,41 @@ struct CompactEvent {
     uint32_t category;
 };
 struct CompactClick {
-    SV id;
+    Key id;
     I64 ts;
     uint32_t campaign;
 };
+// Most people have a few dozen records, where a plain insertion sort beats
+// std::sort's per-call setup. Longer runs (shared devices) use std::sort.
+template <class T, class Less> static void sort_run(T *first, T *last, Less less) {
+    if (last - first > 32) {
+        std::sort(first, last, less);
+        return;
+    }
+    for (T *i = first + 1; i < last; ++i) {
+        T value = *i;
+        T *j = i;
+        for (; j > first && less(value, j[-1]); --j)
+            *j = j[-1];
+        *j = value;
+    }
+}
 // Shard-local person interning. Hashes were computed during parsing; full
 // names are still compared whenever hashes match, so grouping stays exact.
 class PersonTable {
-    // Linked IDs share one canonical name, so equal pointers avoid a cold read.
-    static bool same(SV a, SV b) {
-        return a.size() == b.size() && (a.data() == b.data() || a == b);
-    }
     struct Entry {
         uint64_t hash;
-        SV name;
+        Key name;
         uint32_t id;
     };
     std::vector<Entry> entries;
-    std::vector<SV> names;
+    std::vector<Key> names;
     size_t mask;
     size_t index(uint64_t hash) const { return (hash / SHARDS) & mask; }
 
   public:
+    // Requests a record's slot and name bytes before intern() or find().
+    void prefetch(uint64_t hash) const { __builtin_prefetch(&entries[index(hash)]); }
     explicit PersonTable(size_t n) {
         size_t cap = 16;
         while (cap / 2 < n)
@@ -723,7 +828,7 @@ class PersonTable {
                 names.push_back(p.name);
                 return e.id;
             }
-            if (e.hash == p.hash && same(e.name, p.name))
+            if (e.hash == p.hash && e.name == p.name)
                 return e.id;
         }
         grow();
@@ -734,7 +839,7 @@ class PersonTable {
             auto &e = entries[i];
             if (e.id == UINT32_MAX)
                 return UINT32_MAX;
-            if (e.hash == p.hash && same(e.name, p.name))
+            if (e.hash == p.hash && e.name == p.name)
                 return e.id;
         }
     }
@@ -751,7 +856,7 @@ class PersonTable {
             }
     }
     size_t size() const { return names.size(); }
-    SV name(uint32_t id) const { return names[id]; }
+    const Key &name(uint32_t id) const { return names[id]; }
 };
 // Append-only storage for partition buffers. Blocks grow geometrically and
 // never move, so records are written once instead of being copied on growth.
@@ -764,7 +869,7 @@ template <class T> class BlockList {
     size_t count = 0, used = 0, capacity = 0;
 
   public:
-    void push_back(const T &value) {
+    T *push_back(const T &value) {
         if (used == capacity) {
             capacity = std::min<size_t>(size_t(256) << std::min<size_t>(blocks.size(), 6), 16384);
             T *block = static_cast<T *>(std::malloc(capacity * sizeof(T)));
@@ -773,15 +878,26 @@ template <class T> class BlockList {
             blocks.emplace_back(block);
             used = 0;
         }
-        new (blocks.back().get() + used++) T(value);
+        T *stored = new (blocks.back().get() + used++) T(value);
         ++count;
+        return stored;
     }
     size_t size() const { return count; }
+    const T *first() const { return blocks.empty() ? nullptr : blocks[0].get(); }
     template <class F> void each(F f) const {
         for (size_t b = 0; b < blocks.size(); ++b) {
             size_t n = b + 1 == blocks.size() ? used
                                               : std::min<size_t>(size_t(256) << std::min<size_t>(b, 6), 16384);
             const T *block = blocks[b].get();
+            for (size_t i = 0; i < n; ++i)
+                f(block[i]);
+        }
+    }
+    template <class F> void each_mut(F f) {
+        for (size_t b = 0; b < blocks.size(); ++b) {
+            size_t n = b + 1 == blocks.size() ? used
+                                              : std::min<size_t>(size_t(256) << std::min<size_t>(b, 6), 16384);
+            T *block = blocks[b].get();
             for (size_t i = 0; i < n; ++i)
                 f(block[i]);
         }
@@ -792,8 +908,23 @@ template <class T> class BlockList {
     }
 };
 template <class T> using Partitions = std::array<BlockList<T>, SHARDS>;
+
+// each_ahead for in-place updates: prefetch(row) a fixed distance before f(row).
+template <size_t Ahead = 16, class T, class P, class F>
+void each_ahead_mut(BlockList<T> &list, P prefetch, F f) {
+    std::array<T *, Ahead> ring;
+    size_t n = 0;
+    list.each_mut([&](T &r) {
+        prefetch(r);
+        if (n >= Ahead)
+            f(*ring[n % Ahead]);
+        ring[n++ % Ahead] = &r;
+    });
+    for (size_t k = n > Ahead ? n - Ahead : 0; k < n; ++k)
+        f(*ring[k % Ahead]);
+}
 struct UserRow {
-    SV person;
+    Key person;
     int32_t day;
     I64 sessions, events, revenue;
     int32_t category;
@@ -882,6 +1013,7 @@ static void write_users(const fs::path &path,
         n += results[s].size();
         for (auto &r : results[s])
             bytes += r.person.size();
+    // Short names are stored inside each row, so views of them stay valid here.
     }
     check(user.Reserve(n));
     check(user.ReserveData(bytes));
@@ -892,7 +1024,8 @@ static void write_users(const fs::path &path,
     check(revenue.Reserve(n));
     for (size_t s = first; s < last; ++s)
         for (auto &r : results[s]) {
-            user.UnsafeAppend(r.person.data(), r.person.size());
+            SV name = r.person.view();
+            user.UnsafeAppend(name.data(), name.size());
             day.UnsafeAppend(r.day);
             sessions.UnsafeAppend(r.sessions);
             events.UnsafeAppend(r.events);
@@ -974,35 +1107,34 @@ static int run() {
         Identity people;
         people.build(chunks(inputs.directory(data / "links")), threads);
         std::vector<SV> categories{"unknown"};
-        Map<uint32_t> cat_ids{{"unknown", 0}}, products;
+        Map<uint32_t> cat_ids{{"unknown", 0}}, product_map;
         rows<2>(inputs.file(data / "products.csv"), true, [&](auto &r) {
             auto [it, added] = cat_ids.emplace(r[1], categories.size());
             if (added)
                 categories.push_back(r[1]);
-            products[r[0]] = it->second;
+            product_map[r[0]] = it->second;
         });
+        FlatIds products(product_map);
         std::vector<std::pair<SV, SV>> campaigns{{"organic", "organic"}};
-        Map<uint32_t> campaign_ids;
+        Map<uint32_t> campaign_map;
         rows<2>(inputs.file(data / "campaigns.csv"), true, [&](auto &r) {
-            campaign_ids[r[0]] = campaigns.size();
+            campaign_map[r[0]] = campaigns.size();
             campaigns.emplace_back(r[0], r[1]);
         });
+        FlatIds campaign_ids(campaign_map);
         auto event_jobs = chunks(inputs.directory(data / "events"));
         auto click_jobs = chunks(inputs.directory(data / "clicks"));
         timing("setup");
-        std::vector<Partitions<RawEvent>> parsed(threads);
+        // Valid events and clicks are stored once, in the shard of their raw
+        // user ID. Identity tables are sharded by the same hash, so each shard
+        // later resolves its users against one small, cache-resident table.
+        std::vector<Partitions<EventRec>> events_by_user(threads);
+        std::vector<Partitions<DedupRec>> event_ids(threads);
         parallel(event_jobs.size(), threads, [&](size_t job, size_t worker) {
-            batched_rows<7>(
-                event_jobs[job],
-                [&](auto &r) {
-                    uint64_t hash = Hash{}(r[1]);
-                    people.prefetch(hash);
-                    return hash;
-                },
-                [&](auto &r, uint64_t person_hash) {
+            fast_rows<7>(event_jobs[job].resolve(), [&](auto &r) {
                 if (r[0].empty())
                     return;
-                Event event{{}, BAD, 0, 0};
+                EventRec *stored = nullptr;
                 // ingest_ts is guaranteed valid F1; integer ordering is the
                 // same as its original lexical ordering. Reuse this parse for
                 // lateness and deduplication, even for invalid winning events.
@@ -1017,78 +1149,97 @@ static int run() {
                         // lookup for the much larger view/cart population.
                         uint32_t category = 0;
                         if (cents) {
-                            auto product = products.find(r[5]);
-                            if (product != products.end())
-                                category = product->second;
+                            if (auto product = products.find(r[5]))
+                                category = *product;
                         }
-                        event = {people.person(r[1], person_hash), ts, cents, category};
+                        Key user = Key::of(r[1]);
+                        stored = events_by_user[worker][user.hash() & (SHARDS - 1)].push_back(
+                            {user, ts, cents, category});
                     }
                 }
                 // Invalid winners must remain present until global ID deduplication.
-                uint64_t hash = Hash{}(r[0]);
-                parsed[worker][hash & (SHARDS - 1)].push_back({r[0], ingest, hash, event});
+                Key id = Key::of(r[0]);
+                event_ids[worker][id.hash() & (SHARDS - 1)].push_back({id, ingest, stored});
             });
         });
         timing("parse_events");
-        std::array<Partitions<Event>, SHARDS> event_parts;
+        // The earliest copy of each event ID wins. Every other stored copy is
+        // tombstoned in place, so winners are never copied.
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             size_t count = 0;
-            for (auto &p : parsed)
+            for (auto &p : event_ids)
                 count += p[shard].size();
-            DedupTable<RawEvent> unique(count);
-            for (auto &p : parsed)
-                unique.insert_all(p[shard], [&](const RawEvent &r) {
-                    auto &old = unique.slot(r, r.hash);
-                    if (!old || r.ingest < old->ingest)
+            DedupTable<DedupRec> unique(count);
+            auto drop = [](const DedupRec *r) {
+                if (r->event)
+                    r->event->user = Key{};
+            };
+            for (auto &p : event_ids)
+                unique.insert_all(p[shard], [&](const DedupRec &r) {
+                    auto &old = unique.slot(r, r.id.hash());
+                    if (!old)
                         old = &r;
+                    else if (r.ingest < old->ingest) {
+                        drop(old);
+                        old = &r;
+                    } else
+                        drop(&r);
                 });
-            unique.each([&](auto *r) {
-                if (r->event.ts != BAD)
-                    event_parts[shard][r->event.person.hash & (SHARDS - 1)].push_back(r->event);
-            });
+            for (auto &p : event_ids)
+                p[shard].release();
         });
-        parsed.clear();
-        parsed.shrink_to_fit();
+        event_ids.clear();
+        event_ids.shrink_to_fit();
         timing("dedup_events");
-        std::vector<Partitions<Click>> parsed_clicks(threads);
+        // Click duplicates are identical after unquoting (so validation
+        // commutes), and identical clicks change neither the latest click nor
+        // the set of assisting campaigns. They need no global deduplication.
+        std::vector<Partitions<ClickRec>> clicks_by_user(threads);
         parallel(click_jobs.size(), threads, [&](size_t job, size_t worker) {
-            batched_rows<4>(
-                click_jobs[job],
-                [&](auto &r) {
-                    uint64_t hash = Hash{}(r[1]);
-                    people.prefetch(hash);
-                    return hash;
-                },
-                [&](auto &r, uint64_t person_hash) {
+            fast_rows<4>(click_jobs[job].resolve(), [&](auto &r) {
                 if (r[0].empty() || r[1].empty())
                     return;
                 auto c = campaign_ids.find(r[2]);
-                if (c == campaign_ids.end())
+                if (!c)
                     return;
                 I64 ts = timestamp(r[3]);
                 if (ts == BAD || ts < lo - REACH || ts >= hi)
                     return;
-                // Click duplicates are identical after unquoting, so validation commutes.
-                uint64_t hash = Hash{}(r[0]);
-                parsed_clicks[worker][hash & (SHARDS - 1)].push_back(
-                    {r[0], people.person(r[1], person_hash), hash, ts, c->second});
+                Key user = Key::of(r[1]);
+                clicks_by_user[worker][user.hash() & (SHARDS - 1)].push_back(
+                    {Key::of(r[0]), user, ts, *c});
             });
         });
-        std::array<Partitions<Click>, SHARDS> click_parts;
-        parallel(SHARDS, threads, [&](size_t shard, size_t) {
-            size_t count = 0;
-            for (auto &p : parsed_clicks)
-                count += p[shard].size();
-            DedupTable<Click> unique(count);
-            for (auto &p : parsed_clicks)
-                unique.insert_all(p[shard], [&](const Click &r) { unique.slot(r, r.hash) = &r; });
-            unique.each([&](auto *c) {
-                click_parts[shard][c->person.hash & (SHARDS - 1)].push_back(*c);
-            });
-        });
-        parsed_clicks.clear();
-        parsed_clicks.shrink_to_fit();
         timing("clicks");
+        // Resolve each shard's users to canonical IDs against its own identity
+        // shard, rewriting them in place. A record whose person lives in another
+        // shard stays here (its home shard skips it: its user now hashes
+        // elsewhere) and that shard receives a pointer to it.
+        std::array<Partitions<const EventRec *>, SHARDS> moved_events;
+        std::array<Partitions<const ClickRec *>, SHARDS> moved_clicks;
+        parallel(SHARDS, threads, [&](size_t shard, size_t) {
+            auto resolve = [&](auto &list, auto &moved) {
+                using Rec = std::remove_const_t<std::remove_reference_t<decltype(*list.first())>>;
+                each_ahead_mut(
+                    list, [&](Rec &r) { people.prefetch(r.user.hash()); },
+                    [&](Rec &r) {
+                        if (r.user.empty())
+                            return;
+                        const Key &canon = people.canonical(r.user, r.user.hash());
+                        if (canon == r.user)
+                            return;
+                        size_t to = canon.hash() & (SHARDS - 1);
+                        r.user = canon;
+                        if (to != shard)
+                            moved[to].push_back(&r);
+                    });
+            };
+            for (auto &p : events_by_user)
+                resolve(p[shard], moved_events[shard]);
+            for (auto &p : clicks_by_user)
+                resolve(p[shard], moved_clicks[shard]);
+        });
+        timing("resolve");
         std::array<std::vector<UserRow>, SHARDS> user_rows;
         std::vector<CampaignAccumulator> campaign_rows;
         size_t aggregate_workers = std::min(SHARDS, threads);
@@ -1096,78 +1247,98 @@ static int run() {
             campaign_rows.emplace_back(campaigns.size(), floor_day(lo),
                                        floor_day(hi - 1) - floor_day(lo) + 1, aggregate_workers);
         parallel(SHARDS, threads, [&](size_t shard, size_t worker) {
+            // This shard's records: those stored here whose canonical user is
+            // still in this shard, then those pointed to from other shards.
+            // f(record, hash) for each; hashes are of the canonical user.
+            auto each_record = [&](auto &by_user, auto &moved, auto prefetch, auto f) {
+                using Rec = std::remove_const_t<std::remove_pointer_t<
+                    std::remove_reference_t<decltype(*moved[0][0].first())>>>;
+                for (auto &p : by_user)
+                    each_ahead(
+                        p[shard], [&](const Rec &r) { prefetch(r.user.hash()); },
+                        [&](const Rec &r) {
+                            if (r.user.empty())
+                                return;
+                            uint64_t h = r.user.hash();
+                            if ((h & (SHARDS - 1)) == shard)
+                                f(r, h);
+                        });
+                for (auto &m : moved)
+                    each_ahead(
+                        m[shard], [&](const Rec *const &r) { __builtin_prefetch(r); },
+                        [&](const Rec *const &r) { f(*r, r->user.hash()); });
+            };
             size_t ne = 0, nc = 0;
-            for (size_t s = 0; s < SHARDS; ++s) {
-                ne += event_parts[s][shard].size();
-                nc += click_parts[s][shard].size();
-            }
+            for (auto &p : events_by_user)
+                ne += p[shard].size();
+            for (auto &m : moved_events)
+                ne += m[shard].size();
+            for (auto &p : clicks_by_user)
+                nc += p[shard].size();
+            for (auto &m : moved_clicks)
+                nc += m[shard].size();
             // Intern persons, then group each person's records contiguously with
             // a counting sort. Output row order is irrelevant; only per-person
             // time order matters, so just the short runs are sorted.
+            constexpr uint32_t NONE = UINT32_MAX;
             PersonTable people_here(ne / 8 + 16);
-            std::vector<uint32_t> event_person(ne);
-            {
-                size_t k = 0;
-                for (size_t s = 0; s < SHARDS; ++s)
-                    event_parts[s][shard].each(
-                        [&](const Event &e) { event_person[k++] = people_here.intern(e.person); });
-            }
+            // One pass interns each record's person and copies its fields into
+            // a compact array; a second places them by person (counting sort).
+            struct PersonEvent {
+                uint32_t person;
+                CompactEvent event;
+            };
+            std::vector<PersonEvent> gathered;
+            gathered.reserve(ne);
+            each_record(
+                events_by_user, moved_events, [&](uint64_t h) { people_here.prefetch(h); },
+                [&](const EventRec &e, uint64_t h) {
+                    gathered.push_back({people_here.intern({e.user, h}), {e.ts, e.cents, e.category}});
+                });
             size_t np = people_here.size();
             std::vector<uint32_t> event_start(np + 1), click_start(np + 1);
-            for (auto p : event_person)
-                ++event_start[p + 1];
+            for (auto &g : gathered)
+                ++event_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 event_start[p + 1] += event_start[p];
-            std::vector<CompactEvent> events(ne);
+            std::vector<CompactEvent> events(gathered.size());
             {
                 std::vector<uint32_t> fill(event_start.begin(), event_start.end() - 1);
-                size_t k = 0;
-                for (size_t s = 0; s < SHARDS; ++s) {
-                    auto &ev = event_parts[s][shard];
-                    ev.each([&](const Event &e) {
-                        events[fill[event_person[k++]]++] = {e.ts, e.cents, e.category};
-                    });
-                    ev.release();
-                }
+                for (auto &g : gathered)
+                    events[fill[g.person]++] = g.event;
             }
-            std::vector<uint32_t>().swap(event_person);
-            std::vector<uint32_t> click_person(nc);
-            {
-                size_t k = 0;
-                for (size_t s = 0; s < SHARDS; ++s)
-                    click_parts[s][shard].each([&](const Click &c) {
-                        auto p = people_here.find(c.person);
-                        click_person[k++] = p;
-                        if (p != UINT32_MAX)
-                            ++click_start[p + 1];
-                    });
-            }
+            std::vector<PersonEvent>().swap(gathered);
+            struct PersonClick {
+                uint32_t person;
+                CompactClick click;
+            };
+            std::vector<PersonClick> gathered_clicks;
+            gathered_clicks.reserve(nc);
+            each_record(
+                clicks_by_user, moved_clicks, [&](uint64_t h) { people_here.prefetch(h); },
+                [&](const ClickRec &c, uint64_t h) {
+                    auto p = people_here.find({c.user, h});
+                    if (p != NONE)
+                        gathered_clicks.push_back({p, {c.id, c.ts, c.campaign}});
+                });
+            for (auto &g : gathered_clicks)
+                ++click_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 click_start[p + 1] += click_start[p];
-            std::vector<CompactClick> clicks(click_start[np]);
+            std::vector<CompactClick> clicks(gathered_clicks.size());
             {
                 std::vector<uint32_t> fill(click_start.begin(), click_start.end() - 1);
-                size_t k = 0;
-                for (size_t s = 0; s < SHARDS; ++s) {
-                    auto &cl = click_parts[s][shard];
-                    cl.each([&](const Click &c) {
-                        auto p = click_person[k++];
-                        if (p != UINT32_MAX)
-                            clicks[fill[p]++] = {c.id, c.ts, c.campaign};
-                    });
-                    cl.release();
-                }
+                for (auto &g : gathered_clicks)
+                    clicks[fill[g.person]++] = g.click;
             }
-            std::vector<uint32_t>().swap(click_person);
+            std::vector<PersonClick>().swap(gathered_clicks);
+            auto event_less = [](const CompactEvent &a, const CompactEvent &b) { return a.ts < b.ts; };
+            auto click_less = [](const CompactClick &a, const CompactClick &b) {
+                return a.ts != b.ts ? a.ts < b.ts : b.id < a.id;
+            };
             for (size_t p = 0; p < np; ++p) {
-                auto first = events.begin() + event_start[p], last = events.begin() + event_start[p + 1];
-                if (last - first > 1)
-                    std::sort(first, last, [](auto &a, auto &b) { return a.ts < b.ts; });
-                auto cf = clicks.begin() + click_start[p], cl = clicks.begin() + click_start[p + 1];
-                if (cl - cf > 1)
-                    std::sort(cf, cl, [](auto &a, auto &b) {
-                        return a.ts != b.ts ? a.ts < b.ts : a.id > b.id;
-                    });
+                sort_run(events.data() + event_start[p], events.data() + event_start[p + 1], event_less);
+                sort_run(clicks.data() + click_start[p], clicks.data() + click_start[p + 1], click_less);
             }
             auto &rows = user_rows[shard];
             auto &daily = campaign_rows[worker];
