@@ -897,12 +897,19 @@ class Identity {
 // A valid event, stored once in the shard of its user ID. Deduplication
 // tombstones losing copies in place by clearing the user (no stored event has
 // an empty user); identity resolution rewrites the user to its canonical ID.
+// `when` is the time offset from window_start (never negative, so it fits in
+// 63 bits); a purchase (3% of events) instead sets the top bit and refers to its
+// worker's purchase table, which holds its time, cents and category.
 struct EventRec {
     Key user;
+    uint64_t when;
+};
+struct Purchase {
     I64 ts;
     int cents;
     uint32_t category;
 };
+constexpr uint64_t PURCHASE = uint64_t(1) << 63;
 // Every event row with an ID, valid or not: invalid earliest copies still
 // block later valid ones. `event` is null for an invalid row.
 struct DedupRec {
@@ -915,7 +922,7 @@ struct ClickRec {
     I64 ts;
     uint32_t campaign;
 };
-static_assert(sizeof(EventRec) == 24 && sizeof(DedupRec) == 24 && sizeof(ClickRec) == 32);
+static_assert(sizeof(EventRec) == 16 && sizeof(DedupRec) == 24 && sizeof(ClickRec) == 32);
 // After interning, each person's records are grouped by a counting sort and
 // only the short per-person runs are ordered by time.
 struct CompactEvent {
@@ -1316,6 +1323,7 @@ static int run() {
         // user ID. Identity tables are sharded by the same hash, so each shard
         // later resolves its users against one small, cache-resident table.
         std::vector<Partitions<EventRec>> events_by_user(threads);
+        std::vector<std::vector<Purchase>> purchases(threads);
         std::vector<Partitions<DedupRec>> event_ids(threads);
         parallel(event_jobs.size(), threads, [&](size_t job, size_t worker) {
             fast_rows<7>(event_jobs[job].resolve(), [&](auto &r) {
@@ -1340,8 +1348,13 @@ static int run() {
                                 category = *product;
                         }
                         Key user = Key::of(r[1]);
-                        stored = events_by_user[worker][user.hash() & (SHARDS - 1)].push_back(
-                            {user, ts, cents, category});
+                        uint64_t when = uint64_t(ts - lo);
+                        if (cents) {
+                            auto &table = purchases[worker];
+                            when = PURCHASE | uint64_t(worker) << 32 | table.size();
+                            table.push_back({ts, cents, category});
+                        }
+                        stored = events_by_user[worker][user.hash() & (SHARDS - 1)].push_back({user, when});
                     }
                 }
                 // Invalid winners must remain present until global ID deduplication.
@@ -1407,9 +1420,7 @@ static int run() {
         constexpr size_t PIECES = 64;
         struct PieceEvent {
             Key person; // canonical
-            I64 ts;
-            int cents;
-            uint32_t category;
+            uint64_t when; // as in EventRec
         };
         struct PieceClick {
             Key person, id;
@@ -1432,7 +1443,7 @@ static int run() {
                         const Key &canon = people.canonical(e.user, h);
                         if (canon != e.user)
                             h = canon.hash();
-                        PieceEvent pe{canon, e.ts, e.cents, e.category};
+                        PieceEvent pe{canon, e.when};
                         size_t to = h & (SHARDS - 1);
                         if (to == shard)
                             piece_events[shard][piece_of(h)].push_back(pe);
@@ -1489,7 +1500,12 @@ static int run() {
             std::vector<PersonEvent> gathered;
             gathered.reserve(piece_e.size());
             piece_e.each([&](const PieceEvent &e) {
-                gathered.push_back({people_here.intern({e.person, e.person.hash()}), {e.ts, e.cents, e.category}});
+                CompactEvent ce{lo + I64(e.when), 0, 0};
+                if (e.when & PURCHASE) {
+                    auto &pu = purchases[(e.when >> 32) & 0xFF][uint32_t(e.when)];
+                    ce = {pu.ts, pu.cents, pu.category};
+                }
+                gathered.push_back({people_here.intern({e.person, e.person.hash()}), ce});
             });
             piece_e.release();
             // Radix-sort the piece by time; the stable counting sort by person
