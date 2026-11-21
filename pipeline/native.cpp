@@ -1212,10 +1212,11 @@ static int run() {
         });
         timing("clicks");
         // Resolve each shard's users to canonical IDs against its own identity
-        // shard. A record whose person lives in another shard is moved there and
-        // tombstoned here; the rest are rewritten in place.
-        std::array<Partitions<EventRec>, SHARDS> moved_events;
-        std::array<Partitions<ClickRec>, SHARDS> moved_clicks;
+        // shard, rewriting them in place. A record whose person lives in another
+        // shard stays here (its home shard skips it: its user now hashes
+        // elsewhere) and that shard receives a pointer to it.
+        std::array<Partitions<const EventRec *>, SHARDS> moved_events;
+        std::array<Partitions<const ClickRec *>, SHARDS> moved_clicks;
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             auto resolve = [&](auto &list, auto &moved) {
                 using Rec = std::remove_const_t<std::remove_reference_t<decltype(*list.first())>>;
@@ -1228,14 +1229,9 @@ static int run() {
                         if (canon == r.user)
                             return;
                         size_t to = canon.hash() & (SHARDS - 1);
-                        if (to == shard) {
-                            r.user = canon;
-                            return;
-                        }
-                        Rec copy = r;
-                        copy.user = canon;
-                        moved[to].push_back(copy);
-                        r.user = Key{};
+                        r.user = canon;
+                        if (to != shard)
+                            moved[to].push_back(&r);
                     });
             };
             for (auto &p : events_by_user)
@@ -1251,84 +1247,91 @@ static int run() {
             campaign_rows.emplace_back(campaigns.size(), floor_day(lo),
                                        floor_day(hi - 1) - floor_day(lo) + 1, aggregate_workers);
         parallel(SHARDS, threads, [&](size_t shard, size_t worker) {
-            // This shard's records: those stored here, then those moved here.
-            auto each_list = [&](auto &by_user, auto &moved, auto f) {
+            // This shard's records: those stored here whose canonical user is
+            // still in this shard, then those pointed to from other shards.
+            // f(record, hash) for each; hashes are of the canonical user.
+            auto each_record = [&](auto &by_user, auto &moved, auto prefetch, auto f) {
+                using Rec = std::remove_const_t<std::remove_pointer_t<
+                    std::remove_reference_t<decltype(*moved[0][0].first())>>>;
                 for (auto &p : by_user)
-                    f(p[shard]);
+                    each_ahead(
+                        p[shard], [&](const Rec &r) { prefetch(r.user.hash()); },
+                        [&](const Rec &r) {
+                            if (r.user.empty())
+                                return;
+                            uint64_t h = r.user.hash();
+                            if ((h & (SHARDS - 1)) == shard)
+                                f(r, h);
+                        });
                 for (auto &m : moved)
-                    f(m[shard]);
+                    each_ahead(
+                        m[shard], [&](const Rec *const &r) { __builtin_prefetch(r); },
+                        [&](const Rec *const &r) { f(*r, r->user.hash()); });
             };
             size_t ne = 0, nc = 0;
-            each_list(events_by_user, moved_events, [&](auto &l) { ne += l.size(); });
-            each_list(clicks_by_user, moved_clicks, [&](auto &l) { nc += l.size(); });
+            for (auto &p : events_by_user)
+                ne += p[shard].size();
+            for (auto &m : moved_events)
+                ne += m[shard].size();
+            for (auto &p : clicks_by_user)
+                nc += p[shard].size();
+            for (auto &m : moved_clicks)
+                nc += m[shard].size();
             // Intern persons, then group each person's records contiguously with
             // a counting sort. Output row order is irrelevant; only per-person
             // time order matters, so just the short runs are sorted.
             constexpr uint32_t NONE = UINT32_MAX;
             PersonTable people_here(ne / 8 + 16);
-            std::vector<uint32_t> event_person(ne);
-            {
-                size_t k = 0;
-                each_list(events_by_user, moved_events, [&](auto &l) {
-                    each_ahead(
-                        l, [&](const EventRec &e) { people_here.prefetch(e.user.hash()); },
-                        [&](const EventRec &e) {
-                            event_person[k++] =
-                                e.user.empty() ? NONE : people_here.intern({e.user, e.user.hash()});
-                        });
+            // One pass interns each record's person and copies its fields into
+            // a compact array; a second places them by person (counting sort).
+            struct PersonEvent {
+                uint32_t person;
+                CompactEvent event;
+            };
+            std::vector<PersonEvent> gathered;
+            gathered.reserve(ne);
+            each_record(
+                events_by_user, moved_events, [&](uint64_t h) { people_here.prefetch(h); },
+                [&](const EventRec &e, uint64_t h) {
+                    gathered.push_back({people_here.intern({e.user, h}), {e.ts, e.cents, e.category}});
                 });
-            }
             size_t np = people_here.size();
             std::vector<uint32_t> event_start(np + 1), click_start(np + 1);
-            for (auto p : event_person)
-                if (p != NONE)
-                    ++event_start[p + 1];
+            for (auto &g : gathered)
+                ++event_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 event_start[p + 1] += event_start[p];
-            std::vector<CompactEvent> events(event_start[np]);
+            std::vector<CompactEvent> events(gathered.size());
             {
                 std::vector<uint32_t> fill(event_start.begin(), event_start.end() - 1);
-                size_t k = 0;
-                each_list(events_by_user, moved_events, [&](auto &l) {
-                    l.each([&](const EventRec &e) {
-                        auto p = event_person[k++];
-                        if (p != NONE)
-                            events[fill[p]++] = {e.ts, e.cents, e.category};
-                    });
-                    l.release();
-                });
+                for (auto &g : gathered)
+                    events[fill[g.person]++] = g.event;
             }
-            std::vector<uint32_t>().swap(event_person);
-            std::vector<uint32_t> click_person(nc);
-            {
-                size_t k = 0;
-                each_list(clicks_by_user, moved_clicks, [&](auto &l) {
-                    each_ahead(
-                        l, [&](const ClickRec &c) { people_here.prefetch(c.user.hash()); },
-                        [&](const ClickRec &c) {
-                            auto p = c.user.empty() ? NONE : people_here.find({c.user, c.user.hash()});
-                            click_person[k++] = p;
-                            if (p != NONE)
-                                ++click_start[p + 1];
-                        });
+            std::vector<PersonEvent>().swap(gathered);
+            struct PersonClick {
+                uint32_t person;
+                CompactClick click;
+            };
+            std::vector<PersonClick> gathered_clicks;
+            gathered_clicks.reserve(nc);
+            each_record(
+                clicks_by_user, moved_clicks, [&](uint64_t h) { people_here.prefetch(h); },
+                [&](const ClickRec &c, uint64_t h) {
+                    auto p = people_here.find({c.user, h});
+                    if (p != NONE)
+                        gathered_clicks.push_back({p, {c.id, c.ts, c.campaign}});
                 });
-            }
+            for (auto &g : gathered_clicks)
+                ++click_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 click_start[p + 1] += click_start[p];
-            std::vector<CompactClick> clicks(click_start[np]);
+            std::vector<CompactClick> clicks(gathered_clicks.size());
             {
                 std::vector<uint32_t> fill(click_start.begin(), click_start.end() - 1);
-                size_t k = 0;
-                each_list(clicks_by_user, moved_clicks, [&](auto &l) {
-                    l.each([&](const ClickRec &c) {
-                        auto p = click_person[k++];
-                        if (p != NONE)
-                            clicks[fill[p]++] = {c.id, c.ts, c.campaign};
-                    });
-                    l.release();
-                });
+                for (auto &g : gathered_clicks)
+                    clicks[fill[g.person]++] = g.click;
             }
-            std::vector<uint32_t>().swap(click_person);
+            std::vector<PersonClick>().swap(gathered_clicks);
             auto event_less = [](const CompactEvent &a, const CompactEvent &b) { return a.ts < b.ts; };
             auto click_less = [](const CompactClick &a, const CompactClick &b) {
                 return a.ts != b.ts ? a.ts < b.ts : b.id < a.id;
