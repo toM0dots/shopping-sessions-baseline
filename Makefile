@@ -10,15 +10,20 @@ export IMAGE CPUS MEM PLATFORM
 
 PYTHON ?= python3
 BUILD_JOBS ?= 4
-.PHONY: build fixtures dev run-dev check-dev native native-wheel native-fixtures benchmark
+.PHONY: build fixtures dev run-dev check-dev native native-wheel native-fixtures benchmark dispatcher
 
 ## Build the minimal Arrow/Parquet libraries and native executable
-native:
+native: dispatcher
 	cmake -DJOBS=$(BUILD_JOBS) -P scripts/build_minimal.cmake
 
 ## Faster build-time alternative using the larger PyArrow shared libraries
-native-wheel:
+native-wheel: dispatcher
 	$(PYTHON) scripts/build_native.py
+
+## Build the portable launcher without enabling the fast engine's CPU features
+dispatcher:
+	mkdir -p build
+	$(CXX) -O2 -std=c++17 pipeline/dispatch.cpp -o build/shopping-sessions-dispatch
 
 native-fixtures: native
 	$(PYTHON) scripts/run_fixtures.py $(FIXTURES) -- build/shopping-sessions

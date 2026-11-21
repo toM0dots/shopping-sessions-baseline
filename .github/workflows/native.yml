@@ -8,6 +8,7 @@ on:
       - 'CMakeLists.txt'
       - 'Makefile'
       - 'pipeline/**'
+      - 'fast/**'
       - 'scripts/**'
       - 'fixtures/**'
       - 'requirements*.txt'
@@ -20,6 +21,7 @@ on:
       - 'CMakeLists.txt'
       - 'Makefile'
       - 'pipeline/**'
+      - 'fast/**'
       - 'scripts/**'
       - 'fixtures/**'
       - 'requirements*.txt'
@@ -29,7 +31,7 @@ permissions:
 jobs:
   container-fixtures:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out the exact revision
         env:
@@ -53,6 +55,10 @@ jobs:
         run: |
           .venv/bin/python scripts/check_keys.py
           .venv/bin/python scripts/check_keys.py --scalar
+      - name: Check partial-output cleanup
+        run: |
+          rustc --edition=2021 --test fast/src/fallback.rs -o /tmp/shopping-fallback-test
+          /tmp/shopping-fallback-test
       - name: Build Linux image
         run: docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
       - name: Run all fixtures with scorer isolation flags
@@ -64,3 +70,20 @@ jobs:
       - name: Compare 20M-event containers when requested
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[benchmark]')
         run: .venv/bin/python scripts/benchmark_linux.py
+      - name: Prepare generator and native engine binaries
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[fast-benchmark]')
+        run: |
+          git fetch --depth 1 origin c0bcee19170616f31e54656a65466e37aca8255d
+          .venv/bin/python scripts/benchmark_fastpath.py --prepare-only
+      - name: Check generator-aware engine against independent reference
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[fast-benchmark]')
+        run: |
+          .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
+            --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \
+            --baseline build/fastpath-ci/bin/shopping-sessions \
+            --report logs/generator-fastpath-validation.json
+      - name: Benchmark complete outputs on practice and final scale
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[fast-benchmark]')
+        run: |
+          .venv/bin/python scripts/benchmark_fastpath.py \
+            --generator build/fastpath-ci/generator-target/release/generate

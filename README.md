@@ -1,10 +1,34 @@
 # Shopping Sessions
 
-Native C++ implementation of the [Shopping Sessions challenge](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions),
-with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
-The default runner executes the compiled native pipeline and writes both Parquet tables.
+Native implementation of the [Shopping Sessions challenge](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions),
+with a generator-aware Rust engine and the existing C++ engine as a general fallback.
+The original Python/DuckDB reference remains in `pipeline/pipeline.py`.
+Both production engines read the supplied CSVs and write both Parquet tables.
 
-## Latest update: measured against the latest merged code (v8)
+## Generator-aware fast engine
+
+The fast engine in `fast/` derives from Team 67's MIT-licensed
+[Express Lane, commit `92cf412`](https://github.com/jason-scheffel/express-lane/tree/92cf41220f5f8ee6d94822a43293699ba1286604).
+See [third-party notices](THIRD_PARTY_NOTICES.md) for attribution and local changes.
+It infers reversible ID encodings from the current input, uses decoded event indices
+for direct-slot deduplication, and exploits checked user/time ordering. It also uses
+SIMD field decoding and a direct Parquet writer. It does not ship expected output tables.
+
+The dispatcher selects this engine only on Linux amd64 with the required CPU/OS
+features. Unsupported CPUs use the existing C++ engine. When input constraints fail,
+the fast engine stops its workers, removes partial Parquet parts, and restarts the
+complete input through the C++ engine. The C++ source and PGO build are unchanged
+from `c0bcee1`.
+
+`SS_ENGINE=auto` is the default; `baseline` selects C++, and `fast` requires a supported
+CPU. `SS_ENGINE_TRACE=1` reports selection and any fallback on stderr. Build with
+`docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .`; native macOS builds
+continue to use C++.
+
+Validation and paired benchmark results for this integration are pending. Upstream
+scores do not measure this revision, and 0.30 seconds is a target, not a measured result.
+
+## Previous update: measured against the latest merged code (v8)
 
 On the official generator's **20M events / 5M clicks, seed 17**, six alternating
 fresh-container pairs against `c330a049` gave:

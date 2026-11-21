@@ -10,4 +10,4 @@ case "$0" in
   */*) APP_DIR=${0%/*} ;;
   *) APP_DIR=. ;;
 esac
-exec "$APP_DIR/build/shopping-sessions"
+exec "$APP_DIR/build/shopping-sessions-dispatch"

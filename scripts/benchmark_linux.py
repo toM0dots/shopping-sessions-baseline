@@ -64,7 +64,8 @@ def needs_permission_cleanup(*directories):
     return False
 
 
-def measure_container(image, data, output, scratch, threads, memory, docker_platform):
+def measure_container(image, data, output, scratch, threads, memory, docker_platform,
+                      extra_env=None, cpuset=None):
     """Measure one fresh container; output comparison is the caller's job."""
     container = None
     state = None
@@ -87,8 +88,12 @@ def measure_container(image, data, output, scratch, threads, memory, docker_plat
             "-v", f"{data}:/data:ro,z", "-v", f"{output}:/output:z", "-v", f"{scratch}:/scratch:z",
             "-e", "DATA_DIR=/data", "-e", "OUTPUT_DIR=/output", "-e", "SCRATCH_DIR=/scratch",
             "-e", "HOME=/scratch", "-e", f"NCPU={threads}", "-e", f"MEM_GB={memory.removesuffix('g')}",
-            image["id"],
         ]
+        if cpuset:
+            command += ["--cpuset-cpus", cpuset]
+        for key, value in (extra_env or {}).items():
+            command += ["-e", f"{key}={value}"]
+        command.append(image["id"])
         container = run(command, capture_output=True, text=True).stdout.strip()
         if not re.fullmatch(r"[0-9a-f]{64}", container):
             raise RuntimeError(f"Docker did not return a container ID: {container!r}")
@@ -128,6 +133,7 @@ def measure_container(image, data, output, scratch, threads, memory, docker_plat
         "docker_start_exit_code": started.returncode, "oom_killed": state["OOMKilled"],
         "container_error": state.get("Error", ""),
         "cpu_limit_nanocpus": limits["NanoCpus"], "memory_limit_bytes": limits["Memory"],
+        "cpuset_cpus": limits["CpusetCpus"], "extra_environment": extra_env or {},
         "memory_plus_swap_limit_bytes": limits["MemorySwap"], "pids_limit": limits["PidsLimit"],
         "stdout": started.stdout.strip(), "stderr": started.stderr.strip(),
     }
