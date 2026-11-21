@@ -150,6 +150,30 @@ struct Key {
         return table;
     }
     static Key of(SV s) {
+#if defined(__SSE2__)
+        if (s.size() == 9) {
+            // Eight digits, the common case: validate and convert them in one
+            // register, then combine pairs, quads and halves with three
+            // multiplies. Byte 0 is the most significant digit.
+            uint64_t raw;
+            std::memcpy(&raw, s.data() + 1, 8);
+            __m128i c = _mm_cvtsi64_si128(int64_t(raw));
+            __m128i alpha = _mm_and_si128(_mm_cmpgt_epi8(c, _mm_set1_epi8('a' - 1)),
+                                          _mm_cmplt_epi8(c, _mm_set1_epi8('z' + 1)));
+            __m128i number = _mm_and_si128(_mm_cmpgt_epi8(c, _mm_set1_epi8('0' - 1)),
+                                           _mm_cmplt_epi8(c, _mm_set1_epi8('9' + 1)));
+            if ((_mm_movemask_epi8(_mm_or_si128(alpha, number)) & 0xFF) == 0xFF) {
+                __m128i d = _mm_sub_epi8(_mm_sub_epi8(c, _mm_set1_epi8('0')),
+                                         _mm_and_si128(alpha, _mm_set1_epi8('a' - '0' - 10)));
+                uint64_t lanes = uint64_t(_mm_cvtsi128_si64(d));
+                lanes = (lanes & 0x00FF00FF00FF00FFULL) * 36 + ((lanes >> 8) & 0x00FF00FF00FF00FFULL);
+                lanes = (lanes & 0x0000FFFF0000FFFFULL) * 1296 + ((lanes >> 16) & 0x0000FFFF0000FFFFULL);
+                uint64_t value = (lanes & 0xFFFFFFFFULL) * 1679616 + (lanes >> 32);
+                return Key{PACKED | uint64_t(uint8_t(s[0])) << 45 | uint64_t(7) << 42 | value};
+            }
+            return Key{reinterpret_cast<uintptr_t>(fallback_ids.copy(s))};
+        }
+#endif
         if (s.size() >= 2 && s.size() <= 9) {
             auto &d = digits();
             uint64_t value = 0;
@@ -586,7 +610,84 @@ static I64 days_from_civil(int y, unsigned m, unsigned d) {
     const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
     return era * 146097 + (yo * 365 + yo / 4 - yo / 100 + doy) - 719468;
 }
+// Eight ASCII digits, loaded little-endian (first digit in the low byte).
+static inline bool all_digits8(uint64_t v) {
+    return (v & 0xF0F0F0F0F0F0F0F0ULL) == 0x3030303030303030ULL &&
+           ((v + 0x0606060606060606ULL) & 0xF0F0F0F0F0F0F0F0ULL) == 0x3030303030303030ULL;
+}
+// Their value, first digit most significant (Lemire's multiply trick).
+static inline uint64_t digits8_value(uint64_t v) {
+    v -= 0x3030303030303030ULL;
+    v = v * 10 + (v >> 8);
+    return (((v & 0x000000FF000000FFULL) * (100 + (1000000ULL << 32))) +
+            (((v >> 16) & 0x000000FF000000FFULL) * (1 + (10000ULL << 32)))) >> 32;
+}
+static I64 timestamp_general(SV s);
+// The common forms take fast paths with complete validation; anything else,
+// valid or not, goes to timestamp_general, which decides it.
 static I64 timestamp(SV s) {
+    if (s.size() == 13) {
+        // F3 milliseconds: 5 digits, then 8 decoded at once.
+        uint64_t tail;
+        std::memcpy(&tail, s.data() + 5, 8);
+        I64 head = 0;
+        bool ok = all_digits8(tail);
+        for (int i = 0; i < 5; ++i) {
+            unsigned digit = unsigned(uint8_t(s[i])) - '0';
+            ok &= digit <= 9;
+            head = head * 10 + digit;
+        }
+        return ok ? head * 100000000 + I64(digits8_value(tail)) : BAD;
+    }
+    if (s.size() == 20 && s[19] == 'Z') {
+        // F1 YYYY-MM-DDTHH:MM:SSZ. Separators are checked, then replaced by
+        // '0' so all three words can be checked as digits at once.
+        uint64_t a, b, c;
+        std::memcpy(&a, s.data(), 8);      // YYYY-MM-
+        std::memcpy(&b, s.data() + 8, 8);  // DDTHH:MM
+        std::memcpy(&c, s.data() + 12, 8); // H:MM:SSZ
+        constexpr uint64_t SEP_A = 0xFF0000FF00000000ULL, // bytes 4, 7
+                           SEP_B = 0x0000FF0000FF0000ULL, // bytes 2, 5
+                           SEP_C = 0xFF000000FF00FF00ULL; // bytes 1, 4, 7
+        constexpr uint64_t WANT_A = uint64_t('-') << 32 | uint64_t('-') << 56,
+                           WANT_B = uint64_t('T') << 16 | uint64_t(':') << 40,
+                           WANT_C = uint64_t(':') << 8 | uint64_t(':') << 32 | uint64_t('Z') << 56;
+        constexpr uint64_t ZEROS = 0x3030303030303030ULL;
+        if ((a & SEP_A) == WANT_A && (b & SEP_B) == WANT_B && (c & SEP_C) == WANT_C &&
+            all_digits8((a & ~SEP_A) | (ZEROS & SEP_A)) && all_digits8((b & ~SEP_B) | (ZEROS & SEP_B)) &&
+            all_digits8((c & ~SEP_C) | (ZEROS & SEP_C))) {
+            auto d = [&](int i) { return int(uint8_t(s[i]) - '0'); };
+            int y = d(0) * 1000 + d(1) * 100 + d(2) * 10 + d(3), m = d(5) * 10 + d(6),
+                day = d(8) * 10 + d(9), h = d(11) * 10 + d(12), mi = d(14) * 10 + d(15),
+                sec = d(17) * 10 + d(18);
+            struct DateEntry {
+                uint64_t prefix = 0;
+                uint16_t suffix = 0;
+                I64 midnight = BAD;
+            };
+            static thread_local std::array<DateEntry, 32> dates;
+            uint16_t suffix;
+            std::memcpy(&suffix, s.data() + 8, sizeof(suffix));
+            auto &entry = dates[unsigned(day) & 31];
+            I64 midnight;
+            if (entry.prefix == a && entry.suffix == suffix && entry.midnight != BAD)
+                midnight = entry.midnight;
+            else {
+                static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+                if (y < 1 || m < 1 || m > 12 || day < 1 ||
+                    day > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+                    return BAD;
+                midnight = days_from_civil(y, unsigned(m), unsigned(day)) * DAY;
+                entry = {a, suffix, midnight};
+            }
+            if (h > 23 || mi > 59 || sec > 59)
+                return BAD;
+            return midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
+        }
+    }
+    return timestamp_general(s);
+}
+static I64 timestamp_general(SV s) {
     if (s.empty())
         return BAD;
     if ((s.size() != 20 && s.size() != 25) || s[4] != '-') {
@@ -1557,7 +1658,8 @@ static int run() {
                 ++event_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 event_start[p + 1] += event_start[p];
-            std::vector<CompactEvent> events(gathered.size());
+            // Every slot is written by the counting sort below: no zero fill.
+            std::unique_ptr<CompactEvent[]> events(new CompactEvent[gathered.size()]);
             {
                 std::vector<uint32_t> fill(event_start.begin(), event_start.end() - 1);
                 for (auto &g : gathered)
@@ -1585,7 +1687,7 @@ static int run() {
                 ++click_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
                 click_start[p + 1] += click_start[p];
-            std::vector<CompactClick> clicks(gathered_clicks.size());
+            std::unique_ptr<CompactClick[]> clicks(new CompactClick[gathered_clicks.size()]);
             {
                 std::vector<uint32_t> fill(click_start.begin(), click_start.end() - 1);
                 for (auto &g : gathered_clicks)
@@ -1601,7 +1703,7 @@ static int run() {
                         size_t first = i - 1, last = i + 1;
                         while (last < end && clicks[last].ts == clicks[first].ts)
                             ++last;
-                        std::sort(clicks.begin() + first, clicks.begin() + last,
+                        std::sort(clicks.get() + first, clicks.get() + last,
                                   [](const CompactClick &a, const CompactClick &b) { return b.id < a.id; });
                         i = last - 1;
                     }
