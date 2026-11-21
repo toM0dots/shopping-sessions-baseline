@@ -1372,27 +1372,55 @@ static int run() {
         });
         timing("parse_events");
         // The earliest copy of each event ID wins. Every other stored copy is
-        // tombstoned in place, so winners are never copied.
+        // tombstoned in place, so winners are never copied. Each shard's records
+        // are first split by six more hash bits into 64 buckets of (hash,
+        // record) pairs, so each bucket's table fits in a core's cache; records
+        // are only read on a hash match, in practice a true duplicate.
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
+            struct Ref {
+                uint64_t hash;
+                const DedupRec *rec;
+            };
+            constexpr size_t BUCKETS = 64;
             size_t count = 0;
             for (auto &p : event_ids)
                 count += p[shard].size();
-            DedupTable<DedupRec> unique(count);
+            std::array<std::vector<Ref>, BUCKETS> buckets;
+            for (auto &b : buckets)
+                b.reserve(count / BUCKETS + count / (BUCKETS * 4) + 16);
+            for (auto &p : event_ids)
+                p[shard].each([&](const DedupRec &r) {
+                    uint64_t h = r.id.hash();
+                    buckets[(h >> 6) & (BUCKETS - 1)].push_back({h, &r});
+                });
             auto drop = [](const DedupRec *r) {
                 if (r->event)
                     r->event->user = Key{};
             };
-            for (auto &p : event_ids)
-                unique.insert_all(p[shard], [&](const DedupRec &r) {
-                    auto &old = unique.slot(r, r.id.hash());
-                    if (!old)
-                        old = &r;
-                    else if (r.ingest < old->ingest) {
-                        drop(old);
-                        old = &r;
+            std::vector<Ref> table;
+            for (auto &b : buckets) {
+                size_t cap = 16;
+                while (cap * 2 / 3 < b.size())
+                    cap *= 2;
+                table.assign(cap, Ref{0, nullptr});
+                size_t mask = cap - 1;
+                // Insertion order matches the previous single table: workers,
+                // then each worker's rows in order; ties keep the first seen.
+                for (auto &x : b) {
+                    size_t i = (x.hash >> 12) & mask;
+                    while (table[i].rec && (table[i].hash != x.hash || table[i].rec->id != x.rec->id))
+                        i = (i + 1) & mask;
+                    auto &old = table[i];
+                    if (!old.rec)
+                        old = x;
+                    else if (x.rec->ingest < old.rec->ingest) {
+                        drop(old.rec);
+                        old = x;
                     } else
-                        drop(&r);
-                });
+                        drop(x.rec);
+                }
+                std::vector<Ref>().swap(b);
+            }
             for (auto &p : event_ids)
                 p[shard].release();
         });
