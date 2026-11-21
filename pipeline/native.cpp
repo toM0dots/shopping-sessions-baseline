@@ -514,7 +514,7 @@ template <size_t N, class F> void rows(SV text, bool header, F f) {
 // at least two bytes (then stripped), checked without branches. Lines of 128
 // bytes or more and the last bytes of the text go to rows(), the reference rules.
 template <size_t N, class F>
-__attribute__((target("avx512bw,avx512f,bmi,bmi2,popcnt"))) void rows_avx512(SV text, F &f) {
+__attribute__((target("avx512bw,avx512f,bmi,bmi2,popcnt,pclmul"))) void rows_avx512(SV text, F &f) {
     using U128 = unsigned __int128;
     const char *p = text.data(), *end = p + text.size();
     const __m512i comma = _mm512_set1_epi8(','), quote = _mm512_set1_epi8('"'), lf = _mm512_set1_epi8('\n');
@@ -544,24 +544,44 @@ __attribute__((target("avx512bw,avx512f,bmi,bmi2,popcnt"))) void rows_avx512(SV 
         }
         unsigned count = unsigned(_mm_popcnt_u64(uint64_t(commas)) + _mm_popcnt_u64(uint64_t(commas >> 64)));
         if (count == N - 1) {
+            // Quote rule for the whole line at once. With S the field starts,
+            // E the field ends and Q the quotes, every field has no quotes or
+            // exactly its first and last byte (distinct) quoted iff: Q lies in
+            // S | E; no position is both a quoted start and a quoted end (a
+            // one-byte field); Q has an even count; and no comma lies inside a
+            // quoted span (prefix XOR of Q pairs each quote with the next).
             bool good = true;
-            unsigned start = 0;
-            for (size_t i = 0; i < N; ++i) {
-                unsigned stop = length;
-                if (i + 1 < N) {
-                    uint64_t low = uint64_t(commas);
-                    stop = low ? unsigned(_tzcnt_u64(low)) : 64 + unsigned(_tzcnt_u64(uint64_t(commas >> 64)));
-                    commas &= commas - 1;
-                }
-                unsigned width = stop - start;
-                U128 q = (quotes >> start) & ((U128(1) << width) - 1);
-                bool wrapped = width >= 2 && q == (U128(1) | (U128(1) << (width - 1)));
-                good &= !q | wrapped;
-                fields[i] = SV(p + start + wrapped, width - 2 * wrapped);
-                start = stop + 1;
+            U128 starts = 0;
+            if (quotes) {
+                starts = commas << 1 | 1;
+                U128 ends = commas >> 1 | U128(1) << (length - 1);
+                uint64_t q_lo = uint64_t(quotes), q_hi = uint64_t(quotes >> 64);
+                unsigned total = unsigned(_mm_popcnt_u64(q_lo) + _mm_popcnt_u64(q_hi));
+                const __m128i ones = _mm_set1_epi8(-1);
+                uint64_t in_lo = uint64_t(_mm_cvtsi128_si64(_mm_clmulepi64_si128(_mm_cvtsi64_si128(int64_t(q_lo)), ones, 0)));
+                uint64_t in_hi = uint64_t(_mm_cvtsi128_si64(_mm_clmulepi64_si128(_mm_cvtsi64_si128(int64_t(q_hi)), ones, 0)));
+                in_hi ^= uint64_t(0) - (_mm_popcnt_u64(q_lo) & 1);
+                U128 inside = U128(in_hi) << 64 | in_lo;
+                good = !(quotes & ~(starts | ends)) && !(quotes & starts & ends) && !(total & 1) &&
+                       !(commas & inside);
+                starts &= quotes; // quoted field starts
             }
-            if (good)
+            if (good) {
+                unsigned start = 0;
+                for (size_t i = 0; i < N; ++i) {
+                    unsigned stop = length;
+                    if (i + 1 < N) {
+                        uint64_t low = uint64_t(commas);
+                        stop = low ? unsigned(_tzcnt_u64(low)) : 64 + unsigned(_tzcnt_u64(uint64_t(commas >> 64)));
+                        commas &= commas - 1;
+                    }
+                    unsigned wrapped = unsigned((start < 64 ? uint64_t(starts) >> start
+                                                            : uint64_t(starts >> 64) >> (start - 64)) & 1);
+                    fields[i] = SV(p + start + wrapped, stop - start - 2 * wrapped);
+                    start = stop + 1;
+                }
                 f(fields);
+            }
         }
         p += length + 1;
     }
@@ -570,7 +590,8 @@ __attribute__((target("avx512bw,avx512f,bmi,bmi2,popcnt"))) void rows_avx512(SV 
 }
 static bool has_avx512() {
     static const bool yes = __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("avx512f") &&
-                            __builtin_cpu_supports("bmi2") && __builtin_cpu_supports("popcnt");
+                            __builtin_cpu_supports("bmi2") && __builtin_cpu_supports("popcnt") &&
+                            __builtin_cpu_supports("pclmul");
     return yes;
 }
 #endif
