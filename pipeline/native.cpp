@@ -80,17 +80,39 @@ template <class Row> class DedupTable {
     const Row *&slot(const Row &row, uint64_t hash) {
         // Sharding already consumed the low six bits. Reusing them here would
         // cluster every key in the shard into 1/64 of the initial buckets.
-        size_t i = (hash / SHARDS) & (entries.size() - 1);
+        size_t i = index(hash);
         while (entries[i].value &&
                (entries[i].hash != hash || entries[i].value->id != row.id))
             i = (i + 1) & (entries.size() - 1);
         entries[i].hash = hash;
         return entries[i].value;
     }
+    size_t index(uint64_t hash) const { return (hash / SHARDS) & (entries.size() - 1); }
+    void prefetch(uint64_t hash) const { __builtin_prefetch(&entries[index(hash)], 1); }
+    // Visits winners in slot order. Their records are scattered in memory,
+    // so fetch a few slots ahead.
     template <class F> void each(F f) {
-        for (auto &e : entries)
-            if (e.value)
-                f(e.value);
+        constexpr size_t ahead = 8;
+        for (size_t i = 0; i < entries.size(); ++i) {
+            if (i + ahead < entries.size() && entries[i + ahead].value)
+                __builtin_prefetch(entries[i + ahead].value);
+            if (entries[i].value)
+                f(entries[i].value);
+        }
+    }
+    // Inserts rows in order, prefetching each slot a few rows in advance.
+    template <class List, class F> void insert_all(const List &list, F f) {
+        constexpr size_t ahead = 16;
+        std::array<const Row *, ahead> ring;
+        size_t n = 0;
+        list.each([&](const Row &r) {
+            prefetch(r.hash);
+            if (n >= ahead)
+                f(*ring[n % ahead]);
+            ring[n++ % ahead] = &r;
+        });
+        for (size_t k = n > ahead ? n - ahead : 0; k < n; ++k)
+            f(*ring[k % ahead]);
     }
 };
 
@@ -477,21 +499,29 @@ class Identity {
         }
         std::vector<uint32_t>().swap(size);
         std::vector<uint64_t>().swap(sides);
-        // Flatten every path, then name each component by its bytewise-smallest ID.
-        std::vector<uint32_t> best(total);
-        for (uint32_t i = 0; i < total; ++i) {
+        // Flatten every path, then name each component by its bytewise-smallest
+        // ID. The minimum is order-independent, so ranges run concurrently with
+        // a compare-and-swap per improvement.
+        for (uint32_t i = 0; i < total; ++i)
             parent[i] = find(i);
-            best[i] = i;
-        }
-        for (uint32_t i = 0; i < total; ++i) {
-            auto root = parent[i];
-            if (names[i] < names[best[root]])
-                best[root] = i;
-        }
+        std::unique_ptr<std::atomic<uint32_t>[]> best(new std::atomic<uint32_t>[total]);
+        for (uint32_t i = 0; i < total; ++i)
+            best[i].store(i, std::memory_order_relaxed);
+        constexpr size_t range = 1 << 16;
+        parallel((total + range - 1) / range, threads, [&](size_t job, size_t) {
+            uint32_t first = job * range, last = std::min<size_t>(total, first + range);
+            for (uint32_t i = first; i < last; ++i) {
+                auto &slot = best[parent[i]];
+                uint32_t current = slot.load(std::memory_order_relaxed);
+                while (names[i] < names[current] &&
+                       !slot.compare_exchange_weak(current, i, std::memory_order_relaxed))
+                    ;
+            }
+        });
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             for (auto &e : shards[shard].table)
                 if (!e.key.empty())
-                    e.canon = best[parent[e.canon]];
+                    e.canon = best[parent[e.canon]].load(std::memory_order_relaxed);
         });
     }
     PersonRef person(SV s) const {
@@ -525,6 +555,7 @@ struct RawEvent {
 struct Click {
     SV id;
     PersonRef person;
+    uint64_t hash; // of id
     I64 ts;
     uint32_t campaign;
 };
@@ -878,7 +909,7 @@ static int run() {
                 count += p[shard].size();
             DedupTable<RawEvent> unique(count);
             for (auto &p : parsed)
-                p[shard].each([&](const RawEvent &r) {
+                unique.insert_all(p[shard], [&](const RawEvent &r) {
                     auto &old = unique.slot(r, r.hash);
                     if (!old || r.ingest < old->ingest)
                         old = &r;
@@ -903,8 +934,9 @@ static int run() {
                 if (ts == BAD || ts < lo - REACH || ts >= hi)
                     return;
                 // Click duplicates are identical after unquoting, so validation commutes.
-                parsed_clicks[worker][Hash{}(r[0]) & (SHARDS - 1)].push_back(
-                    {r[0], people.person(r[1]), ts, c->second});
+                uint64_t hash = Hash{}(r[0]);
+                parsed_clicks[worker][hash & (SHARDS - 1)].push_back(
+                    {r[0], people.person(r[1]), hash, ts, c->second});
             });
         });
         std::array<Partitions<Click>, SHARDS> click_parts;
@@ -914,7 +946,7 @@ static int run() {
                 count += p[shard].size();
             DedupTable<Click> unique(count);
             for (auto &p : parsed_clicks)
-                p[shard].each([&](const Click &r) { unique.slot(r, Hash{}(r.id)) = &r; });
+                unique.insert_all(p[shard], [&](const Click &r) { unique.slot(r, r.hash) = &r; });
             unique.each([&](auto *c) {
                 click_parts[shard][c->person.hash & (SHARDS - 1)].push_back(*c);
             });
