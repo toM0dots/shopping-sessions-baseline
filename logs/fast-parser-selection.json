@@ -1,0 +1,15 @@
+{
+  "label": "bb14",
+  "settings": {},
+  "image": {
+    "reference": "shopping-sessions:bb14",
+    "id": "sha256:5fce07bccfb821e0ee674f5c4713957ff4727cfc9f9bf5ee4d9d4c3ef2a30acb",
+    "os": "linux",
+    "architecture": "amd64",
+    "repo_digests": []
+  },
+  "selection_method": "Lowest median candidate/baseline ratio in the complete predeclared screening set; requires separate holdout confirmation",
+  "screening_source": "logs/linux-fast-parser-sweep.json",
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44956950677",
+  "validated_source_commit": "973221fbfa142a5c6822904105b9a4f9f934fe84"
+}

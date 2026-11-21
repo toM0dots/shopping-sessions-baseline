@@ -36,6 +36,17 @@ jobs:
         run: |
           python3 -m venv .venv
           .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Require the production fast-engine CPU contract
+        if: contains(github.event.head_commit.message, '[fast-release]')
+        run: |
+          cat > /tmp/check-fast-cpu.cpp <<'CPP'
+          #define main dispatch_entry_main
+          #include "pipeline/dispatch.cpp"
+          #undef main
+          int main() { return fast_cpu() ? 0 : 1; }
+          CPP
+          g++ -O2 -std=c++17 -I "$PWD" /tmp/check-fast-cpu.cpp -o /tmp/check-fast-cpu
+          /tmp/check-fast-cpu
       - name: Build the identical fast engine and portable dispatcher
         run: |
           docker build --target fast-builder -t shopping-sessions:fast-ci .
@@ -44,6 +55,34 @@ jobs:
           docker cp "$cid:/fast-bin/." build/public-ci/bin
           docker rm "$cid"
           g++ -O2 -std=c++17 pipeline/dispatch.cpp -o build/public-ci/bin/shopping-sessions-dispatch
+      - name: Verify the release uses the measured engine and settings
+        if: contains(github.event.head_commit.message, '[fast-release]')
+        run: |
+          .venv/bin/python - <<'PY'
+          import hashlib, json, pathlib
+          config = json.loads(pathlib.Path('logs/fast-release-selection.json').read_text())
+          for path, expected in config['source_sha256'].items():
+              actual = hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'Release source differs from the validated source: {path}')
+          actual = hashlib.sha256(pathlib.Path('build/public-ci/bin/shopping-sessions-fast').read_bytes()).hexdigest()
+          expected = config.get('expected_fast_binary_sha256')
+          if expected and actual != expected:
+              raise SystemExit('Release fast binary differs from the fully validated benchmark variant')
+          dockerfile = pathlib.Path('Dockerfile').read_text()
+          builder = dockerfile.split('FROM debian:', 1)[0]
+          runtime = dockerfile.rsplit('FROM ', 1)[1]
+          for section, settings in [(builder, config['compile_settings']), (runtime, config['runtime_settings'])]:
+              for key, value in settings.items():
+                  if f'ENV {key}={value}\n' not in section:
+                      raise SystemExit(f'Missing measured production setting: {key}={value}')
+          print('BEGIN_FAST_RELEASE_BINARY_JSON')
+          print(json.dumps({'fast_binary_sha256': actual, 'expected_fast_binary_sha256': expected,
+                            'exact_binary_match': actual == expected if expected else None,
+                            'all_source_hashes_match': True, 'compile_settings': config['compile_settings'],
+                            'runtime_settings': config['runtime_settings']}, indent=2))
+          print('END_FAST_RELEASE_BINARY_JSON')
+          PY
       - name: Build checksum-pinned official generator
         run: |
           .venv/bin/python - <<'PY'
@@ -64,7 +103,17 @@ jobs:
                           '--target-dir', str(work / 'generator-target')], check=True)
           PY
       - name: Compare public 1M outputs with official golden CSVs
+        env:
+          RELEASE_VERIFY: ${{ contains(github.event.head_commit.message, '[fast-release]') }}
         run: |
-          .venv/bin/python scripts/check_public_fastpath.py build/public-ci/generator-target/release/generate \
-            --candidate build/public-ci/bin/shopping-sessions-dispatch \
-            --report logs/public-generator-fastpath.json
+          .venv/bin/python - <<'PY'
+          import json, os, pathlib, shlex, subprocess, sys
+          settings = {}
+          if os.environ.get('RELEASE_VERIFY') == 'true':
+              settings = json.loads(pathlib.Path('logs/fast-release-selection.json').read_text())['runtime_settings']
+          command = shlex.join(['env', *[f'{k}={v}' for k, v in settings.items()],
+                               'build/public-ci/bin/shopping-sessions-dispatch'])
+          subprocess.run([sys.executable, 'scripts/check_public_fastpath.py',
+                          'build/public-ci/generator-target/release/generate', '--candidate', command,
+                          '--report', 'logs/public-generator-fastpath.json'], check=True)
+          PY

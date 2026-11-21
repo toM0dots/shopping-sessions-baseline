@@ -7,6 +7,7 @@ COPY fast/Cargo.toml fast/Cargo.lock ./
 COPY fast/.cargo .cargo
 COPY fast/src src
 COPY fast/LICENSE /usr/share/doc/shopping-sessions-fast/LICENSE
+ENV XL_BB=14
 RUN mkdir -p /fast-bin \
     && if [ "$(uname -m)" = x86_64 ]; then \
         cargo build --locked --release --target x86_64-unknown-linux-musl \

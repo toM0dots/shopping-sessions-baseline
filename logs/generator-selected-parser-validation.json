@@ -1,0 +1,739 @@
+{
+  "schema_version": 1,
+  "success": true,
+  "mode_checks": "strict",
+  "seeds": [
+    41,
+    73
+  ],
+  "events_requested": 100000,
+  "threads": [
+    1,
+    4,
+    8
+  ],
+  "candidate": [
+    "env",
+    "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/build/parser-selected/bin/shopping-sessions-dispatch"
+  ],
+  "baseline": [
+    "build/fastpath-ci/bin/shopping-sessions"
+  ],
+  "reference": [
+    "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/.venv/bin/python",
+    "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/pipeline/pipeline.py"
+  ],
+  "work_dir": "/tmp/generator-fastpath-iudtdt2_",
+  "cases": [
+    {
+      "seed": 41,
+      "name": "normal",
+      "mutation": {},
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.015505144999906406,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.5 s.sample=1.3 maps+keys=0.2 lookups=0.0 setup=0.0 parse=5.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.6 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.8 total=13.2 peak_rss_kb=47280\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.7 st2b=0.9 st2b_max_bucket=0.9 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 13.2 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.020824874000027194,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=3.0 s.sample=0.3 maps+keys=0.2 lookups=0.0 setup=0.0 parse=3.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=4.5 stitch=0.0 ev3b=2.2 c.pre=0.0 write=2.7 total=16.7 peak_rss_kb=119556\n[v2b] prof (thread-ms): scatter=1.4 compact=0.2 runs=9.6 st2b=0.9 st2b_max_bucket=0.9 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 16.7 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.032076159000098414,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=5.1 s.sample=0.1 maps+keys=0.2 lookups=0.0 setup=0.0 parse=6.8 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=10.7 stitch=0.0 ev3b=0.4 c.pre=0.0 write=4.7 total=28.5 peak_rss_kb=209044\n[v2b] prof (thread-ms): scatter=3.1 compact=0.3 runs=42.3 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.5 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 28.5 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.07017150399997263,
+        "stderr": "setup=0.0102829 parse=0.00994951 dedup_events=0.00135406 resolve=0.0226464 sessionize_aggregate=0.0143969 write_parquet=0.00540297 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0640834}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "shuffled",
+      "mutation": {
+        "rows_shuffled": 135995
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.015173357000094256,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.6 s.sample=1.4 maps+keys=0.2 lookups=0.1 setup=0.0 parse=4.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.6 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.8 total=12.9 peak_rss_kb=47348\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.7 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.1\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 12.9 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.02272696599993651,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.6 s.sample=0.7 maps+keys=0.3 lookups=1.0 setup=0.0 parse=5.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=6.6 stitch=0.0 ev3b=2.8 c.pre=0.0 write=2.4 total=20.5 peak_rss_kb=122260\n[v2b] prof (thread-ms): scatter=1.8 compact=0.2 runs=15.5 st2b=3.9 st2b_max_bucket=3.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=3.1\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 20.6 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.03739511899993886,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=1.9 s.sample=0.3 maps+keys=0.2 lookups=4.2 setup=0.0 parse=9.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=9.1 stitch=0.0 ev3b=0.7 c.pre=0.0 write=7.8 total=33.7 peak_rss_kb=207416\n[v2b] prof (thread-ms): scatter=3.4 compact=0.4 runs=41.0 st2b=2.2 st2b_max_bucket=2.2 st2b_pass1=0.1 st2b_pass2=1.7 st2b_sort=0.4\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 33.7 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06598639500020909,
+        "stderr": "setup=0.0102775 parse=0.00994877 dedup_events=0.00142772 resolve=0.0179131 sessionize_aggregate=0.0148895 write_parquet=0.00548793 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0599919}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "duplicate_clicks",
+      "mutation": {
+        "distinct_click_ids_copied": 2048,
+        "additional_files": 8,
+        "additional_identical_click_rows": 16384
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.015414001999943139,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.6 s.sample=1.3 maps+keys=0.3 lookups=0.0 setup=0.0 parse=5.4 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.8 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.8 total=13.8 peak_rss_kb=47356\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.9 st2b=1.1 st2b_max_bucket=1.1 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.3\n[v2b] rows: events=105105 clicks=41979 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 13.8 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.021735941999850183,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.5 s.mmap=0.6 s.sample=2.5 maps+keys=0.2 lookups=0.0 setup=0.0 parse=6.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=5.4 stitch=0.0 ev3b=0.3 c.pre=0.0 write=1.1 total=16.6 peak_rss_kb=126076\n[v2b] prof (thread-ms): scatter=1.6 compact=0.2 runs=14.2 st2b=1.0 st2b_max_bucket=1.0 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.3\n[v2b] rows: events=105105 clicks=41979 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 16.7 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.03583643899992239,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.8 s.sample=0.6 maps+keys=0.3 lookups=1.1 setup=0.0 parse=12.7 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=8.1 stitch=0.0 ev3b=2.3 c.pre=0.0 write=4.6 total=31.1 peak_rss_kb=199924\n[v2b] prof (thread-ms): scatter=1.5 compact=0.2 runs=30.6 st2b=3.9 st2b_max_bucket=3.9 st2b_pass1=0.1 st2b_pass2=0.5 st2b_sort=3.3\n[v2b] rows: events=105105 clicks=41979 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 31.1 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06586945999993077,
+        "stderr": "setup=0.0102236 parse=0.010819 dedup_events=0.00128211 resolve=0.0172483 sessionize_aggregate=0.0148957 write_parquet=0.00538284 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.059899}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "opaque_ids",
+      "mutation": {
+        "events": 105114,
+        "clicks": 25597,
+        "links": 5226
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.10666726699992068,
+          "stderr": "[engine] fast\n[engine] fallback: no user key\nsetup=0.0111483 parse=0.0168036 dedup_events=0.00395914 resolve=0.0276888 sessionize_aggregate=0.0172966 write_parquet=0.00567959 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.082625}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.06977875399979894,
+          "stderr": "[engine] fast\n[engine] fallback: no user key\nsetup=0.0109891 parse=0.00726349 dedup_events=0.00192877 resolve=0.0121335 sessionize_aggregate=0.00883157 write_parquet=0.00417879 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0453771}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.07684949700001198,
+          "stderr": "[engine] fast\n[engine] fallback: no user key\nsetup=0.01122 parse=0.00806809 dedup_events=0.0020766 resolve=0.011976 sessionize_aggregate=0.0097428 write_parquet=0.00464031 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0478015}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.08196300299982795,
+        "stderr": "setup=0.0106963 parse=0.0166017 dedup_events=0.0033349 resolve=0.0232001 sessionize_aggregate=0.0160261 write_parquet=0.00555933 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0754622}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "mixed_ids",
+      "mutation": {
+        "rows_changed": {
+          "events": 13,
+          "clicks": 8,
+          "links": 9
+        },
+        "ids_renamed": {
+          "event": 6,
+          "click": 6,
+          "user": 6
+        },
+        "id_lengths_bytes": {
+          "event": [
+            311,
+            9,
+            9,
+            23,
+            13,
+            2
+          ],
+          "click": [
+            311,
+            9,
+            9,
+            23,
+            13,
+            2
+          ],
+          "user": [
+            310,
+            9,
+            9,
+            22,
+            12,
+            2
+          ]
+        },
+        "additional_later_long_id_duplicate": 1
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.015288535000081538,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.6 s.sample=1.4 maps+keys=0.2 lookups=0.1 setup=0.0 parse=4.8 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.7 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.8 total=13.3 peak_rss_kb=47216\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.8 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.1\n[v2b] rows: events=105106 clicks=25595 links=5201 | kept valid: simple=94879 complex=835 odd=1782 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=782 cx_users=37 joined=8 nb=8 nub=3\n[v2b] exit at 13.4 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.02048433599998134,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=2.4 s.sample=0.0 maps+keys=0.2 lookups=0.0 setup=0.0 parse=3.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=6.2 stitch=0.0 ev3b=0.8 c.pre=0.0 write=3.8 total=17.6 peak_rss_kb=124068\n[v2b] prof (thread-ms): scatter=1.8 compact=0.2 runs=16.1 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.5 st2b_sort=0.2\n[v2b] rows: events=105106 clicks=25595 links=5201 | kept valid: simple=94879 complex=835 odd=1782 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=782 cx_users=37 joined=8 nb=8 nub=3\n[v2b] exit at 17.6 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.04050652300020374,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=1.1 s.sample=1.7 maps+keys=0.2 lookups=0.0 setup=0.0 parse=11.7 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=10.4 stitch=0.0 ev3b=2.3 c.pre=0.0 write=7.6 total=35.8 peak_rss_kb=229580\n[v2b] prof (thread-ms): scatter=2.3 compact=0.3 runs=35.2 st2b=5.9 st2b_max_bucket=5.9 st2b_pass1=0.1 st2b_pass2=3.8 st2b_sort=2.0\n[v2b] rows: events=105106 clicks=25595 links=5201 | kept valid: simple=94879 complex=835 odd=1782 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=782 cx_users=37 joined=8 nb=8 nub=3\n[v2b] exit at 35.8 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06414373699999487,
+        "stderr": "setup=0.0101542 parse=0.00977723 dedup_events=0.00139486 resolve=0.0173459 sessionize_aggregate=0.0141686 write_parquet=0.00539848 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0582897}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "permuted_event_ids",
+      "mutation": {
+        "rows_changed": 105105,
+        "distinct_ids_permuted": 99963
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.08442413800003123,
+          "stderr": "[engine] fast\n[engine] fallback: a user has two runs\nsetup=0.0109849 parse=0.0101607 dedup_events=0.0014633 resolve=0.0230573 sessionize_aggregate=0.0143258 write_parquet=0.00526085 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0653085}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.05875427699993452,
+          "stderr": "[engine] fast\n[engine] fallback: a user has two runs\nsetup=0.0105438 parse=0.00469463 dedup_events=0.000743311 resolve=0.0100485 sessionize_aggregate=0.00833655 write_parquet=0.00420825 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0386241}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.09482988900003875,
+          "stderr": "[engine] fast\n[engine] fallback: a user has two runs\nsetup=0.0115454 parse=0.011365 dedup_events=0.00170157 resolve=0.0165081 sessionize_aggregate=0.0157652 write_parquet=0.0065045 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0634349}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06531582900015565,
+        "stderr": "setup=0.0109259 parse=0.0100802 dedup_events=0.00133151 resolve=0.0180187 sessionize_aggregate=0.0139655 write_parquet=0.00543447 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0597997}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "permuted_click_ids",
+      "mutation": {
+        "rows_changed": 25595,
+        "distinct_ids_permuted": 24986
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.01873267900009523,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.7 s.sample=1.4 maps+keys=0.2 lookups=0.2 setup=0.0 parse=7.2 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=4.3 stitch=0.0 ev3b=0.1 c.pre=0.0 write=2.1 total=16.8 peak_rss_kb=47220\n[v2b] prof (thread-ms): scatter=0.5 compact=0.3 runs=3.2 st2b=1.0 st2b_max_bucket=1.0 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 16.8 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.02379382499998428,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=3.0 s.sample=0.0 maps+keys=0.2 lookups=0.0 setup=0.0 parse=3.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=6.2 stitch=0.0 ev3b=3.1 c.pre=0.0 write=5.0 total=21.7 peak_rss_kb=122692\n[v2b] prof (thread-ms): scatter=1.5 compact=0.2 runs=15.6 st2b=0.9 st2b_max_bucket=0.9 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 21.7 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.03763853400005246,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=2.5 s.sample=0.0 maps+keys=0.2 lookups=0.0 setup=0.0 parse=7.6 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=12.4 stitch=0.0 ev3b=2.7 c.pre=0.0 write=7.7 total=33.9 peak_rss_kb=231660\n[v2b] prof (thread-ms): scatter=2.4 compact=0.2 runs=43.2 st2b=1.9 st2b_max_bucket=1.9 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=1.3\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94942 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 33.9 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06918321399984961,
+        "stderr": "setup=0.0101116 parse=0.0103891 dedup_events=0.00129338 resolve=0.022694 sessionize_aggregate=0.0141924 write_parquet=0.00528096 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0640025}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "cross_person_links",
+      "mutation": {
+        "previously_separate_components_joined": 24
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.018936100000018996,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.5 s.mmap=0.6 s.sample=0.9 maps+keys=0.2 lookups=0.9 setup=0.0 parse=6.7 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=4.2 stitch=0.0 ev3b=0.0 c.pre=0.0 write=3.1 total=17.2 peak_rss_kb=47348\n[v2b] prof (thread-ms): scatter=0.5 compact=0.3 runs=3.2 st2b=1.1 st2b_max_bucket=1.1 st2b_pass1=0.1 st2b_pass2=0.8 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5224 | kept valid: simple=79827 complex=15890 odd=1773 | runs=3333 sessions=18115 user_rows=12623 uf_nodes=802 cx_users=56 joined=8 nb=8 nub=3\n[v2b] exit at 17.2 ms\n",
+          "comparison": "user_daily: rows 12623 vs 12623; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13765 vs 13765; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.024207377999800883,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=3.1 s.sample=0.0 maps+keys=0.2 lookups=0.0 setup=0.0 parse=2.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=7.8 stitch=0.0 ev3b=0.0 c.pre=0.0 write=6.5 total=20.7 peak_rss_kb=123700\n[v2b] prof (thread-ms): scatter=1.6 compact=0.2 runs=15.2 st2b=1.0 st2b_max_bucket=0.9 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5224 | kept valid: simple=79827 complex=15890 odd=1773 | runs=3333 sessions=18115 user_rows=12623 uf_nodes=802 cx_users=56 joined=8 nb=8 nub=3\n[v2b] exit at 20.8 ms\n",
+          "comparison": "user_daily: rows 12623 vs 12623; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13765 vs 13765; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.04328558699990026,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.8 s.sample=0.7 maps+keys=0.2 lookups=7.3 setup=0.0 parse=12.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=9.2 stitch=0.0 ev3b=0.8 c.pre=0.0 write=8.2 total=40.4 peak_rss_kb=233712\n[v2b] prof (thread-ms): scatter=3.0 compact=0.3 runs=39.8 st2b=1.0 st2b_max_bucket=1.0 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5224 | kept valid: simple=79827 complex=15890 odd=1773 | runs=3333 sessions=18115 user_rows=12623 uf_nodes=802 cx_users=56 joined=8 nb=8 nub=3\n[v2b] exit at 40.4 ms\n",
+          "comparison": "user_daily: rows 12623 vs 12623; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13765 vs 13765; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06393349400013904,
+        "stderr": "setup=0.0101756 parse=0.009824 dedup_events=0.00138216 resolve=0.0168732 sessionize_aggregate=0.0148066 write_parquet=0.00546414 \n{\"user_rows\":12623,\"campaign_rows\":13765,\"sessions\":18115,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0585741}\n",
+        "comparison": "user_daily: rows 12623 vs 12623; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13765 vs 13765; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "earliest_invalid",
+      "mutation": {
+        "valid_events_poisoned_by_earlier_invalid_copy": 64
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.015663835999930598,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.6 s.sample=1.4 maps+keys=0.2 lookups=0.1 setup=0.0 parse=5.5 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.6 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.7 total=14.0 peak_rss_kb=47288\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.8 st2b=0.9 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=105169 clicks=25595 links=5201 | kept valid: simple=94878 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 14.0 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.022980471999971996,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=3.0 s.sample=0.0 maps+keys=0.2 lookups=0.0 setup=0.0 parse=5.8 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=6.5 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.5 total=17.7 peak_rss_kb=123708\n[v2b] prof (thread-ms): scatter=1.8 compact=0.2 runs=14.8 st2b=1.7 st2b_max_bucket=1.7 st2b_pass1=0.1 st2b_pass2=1.2 st2b_sort=0.4\n[v2b] rows: events=105169 clicks=25595 links=5201 | kept valid: simple=94878 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 17.8 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.03575709500000812,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=2.2 s.sample=0.3 maps+keys=0.2 lookups=0.9 setup=0.0 parse=8.1 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=10.7 stitch=0.0 ev3b=2.2 c.pre=0.0 write=7.0 total=32.3 peak_rss_kb=229576\n[v2b] prof (thread-ms): scatter=2.4 compact=0.2 runs=42.6 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=105169 clicks=25595 links=5201 | kept valid: simple=94878 complex=775 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 32.4 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06547270900000512,
+        "stderr": "setup=0.00999709 parse=0.00982162 dedup_events=0.0014145 resolve=0.0175592 sessionize_aggregate=0.0155364 write_parquet=0.00534785 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97426,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0597247}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "purchase_boundaries",
+      "mutation": {
+        "distinct_purchase_events_changed": 104,
+        "event_copies_changed": 121,
+        "price_values": [
+          "1",
+          "0",
+          "10000000",
+          "99999999",
+          "00000001",
+          "010000000",
+          "100000000",
+          "0010000000",
+          "1000000000",
+          "-1",
+          "1.0",
+          "price",
+          ""
+        ],
+        "unknown_product_lengths_bytes": [
+          15,
+          24,
+          40
+        ],
+        "known_product_cases": 26,
+        "quoted_cases": 52,
+        "unquoted_cases": 52
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.01535763899983067,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.6 s.sample=1.4 maps+keys=0.2 lookups=0.1 setup=0.0 parse=4.6 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.7 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.8 total=13.2 peak_rss_kb=47344\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.9 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.1\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94884 complex=775 odd=1772 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 13.2 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.024334883999927115,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=2.8 s.sample=0.1 maps+keys=0.2 lookups=3.8 setup=0.0 parse=4.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=6.8 stitch=0.0 ev3b=2.1 c.pre=0.0 write=1.4 total=21.8 peak_rss_kb=128112\n[v2b] prof (thread-ms): scatter=1.5 compact=3.2 runs=14.0 st2b=0.9 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94884 complex=775 odd=1772 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 21.9 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.039864170999862836,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=3.5 s.sample=0.3 maps+keys=0.2 lookups=0.3 setup=0.0 parse=12.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=9.9 stitch=0.0 ev3b=2.1 c.pre=0.0 write=8.3 total=37.1 peak_rss_kb=238364\n[v2b] prof (thread-ms): scatter=3.7 compact=0.3 runs=38.4 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.5 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94884 complex=775 odd=1772 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 37.1 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06512121599985221,
+        "stderr": "setup=0.0103957 parse=0.00986773 dedup_events=0.00146532 resolve=0.0170991 sessionize_aggregate=0.0142053 write_parquet=0.0055421 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97431,\"revenue_cents\":281663770,\"elapsed_seconds\":0.0586242}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "unusual_timestamps",
+      "mutation": {
+        "events": 341,
+        "clicks": 310
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.015399967999883302,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.7 s.sample=1.4 maps+keys=0.2 lookups=0.2 setup=0.0 parse=5.0 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=3.7 stitch=0.0 ev3b=0.0 c.pre=0.0 write=1.7 total=13.6 peak_rss_kb=47288\n[v2b] prof (thread-ms): scatter=0.4 compact=0.3 runs=2.8 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.1\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94793 complex=774 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 13.6 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13703 vs 13703; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.026561530999970273,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=1.3 s.sample=0.0 maps+keys=0.2 lookups=0.7 setup=0.0 parse=6.9 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=5.6 stitch=0.0 ev3b=2.7 c.pre=0.0 write=5.0 total=23.1 peak_rss_kb=124776\n[v2b] prof (thread-ms): scatter=1.4 compact=0.2 runs=13.7 st2b=4.4 st2b_max_bucket=4.4 st2b_pass1=0.1 st2b_pass2=0.5 st2b_sort=3.8\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94793 complex=774 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 23.1 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13703 vs 13703; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.03319631499994102,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=0.9 s.sample=0.5 maps+keys=0.2 lookups=1.6 setup=0.0 parse=9.3 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=8.6 stitch=0.0 ev3b=0.5 c.pre=0.0 write=6.6 total=28.9 peak_rss_kb=212948\n[v2b] prof (thread-ms): scatter=2.4 compact=0.2 runs=34.0 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=105105 clicks=25595 links=5201 | kept valid: simple=94793 complex=774 odd=1773 | runs=3333 sessions=20346 user_rows=12945 uf_nodes=754 cx_users=32 joined=8 nb=8 nub=3\n[v2b] exit at 28.9 ms\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13703 vs 13703; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06307685800015861,
+        "stderr": "setup=0.0100869 parse=0.00992594 dedup_events=0.00140945 resolve=0.0163628 sessionize_aggregate=0.0141873 write_parquet=0.00535267 \n{\"user_rows\":12945,\"campaign_rows\":13703,\"sessions\":20346,\"events\":97340,\"revenue_cents\":42510864,\"elapsed_seconds\":0.0573698}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13703 vs 13703; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "unusual_catalog",
+      "mutation": {
+        "distinct_new_categories": 48
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.06821558799993,
+          "stderr": "[engine] fast\n[engine] fallback: products.csv is not canonical, or has too many categories\nsetup=0.0111064 parse=0.00994302 dedup_events=0.00142085 resolve=0.0172442 sessionize_aggregate=0.0142212 write_parquet=0.00544755 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.059428}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.049986189000037484,
+          "stderr": "[engine] fast\n[engine] fallback: products.csv is not canonical, or has too many categories\nsetup=0.010665 parse=0.00466614 dedup_events=0.000717235 resolve=0.0102218 sessionize_aggregate=0.00823942 write_parquet=0.00411689 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0386803}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.055422843000087596,
+          "stderr": "[engine] fast\n[engine] fallback: products.csv is not canonical, or has too many categories\nsetup=0.0123808 parse=0.00511932 dedup_events=0.000806819 resolve=0.00910167 sessionize_aggregate=0.00907675 write_parquet=0.00481822 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0413626}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.07263878699995985,
+        "stderr": "setup=0.0102999 parse=0.0100644 dedup_events=0.00149531 resolve=0.0236886 sessionize_aggregate=0.0147226 write_parquet=0.00566026 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0659912}\n",
+        "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "wide_window",
+      "mutation": {
+        "window_extended_days": 40
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.06895147099999122,
+          "stderr": "[engine] fast\n[engine] fallback: window\nsetup=0.0110622 parse=0.00987782 dedup_events=0.001439 resolve=0.0176036 sessionize_aggregate=0.0154565 write_parquet=0.00595151 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0614456}\n",
+          "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.05240688799995041,
+          "stderr": "[engine] fast\n[engine] fallback: window\nsetup=0.010796 parse=0.00478481 dedup_events=0.000761818 resolve=0.0103097 sessionize_aggregate=0.0116704 write_parquet=0.00551661 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0438948}\n",
+          "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.061010549000002356,
+          "stderr": "[engine] fast\n[engine] fallback: window\nsetup=0.0117338 parse=0.00602762 dedup_events=0.000828023 resolve=0.0105745 sessionize_aggregate=0.0157118 write_parquet=0.00723974 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0521778}\n",
+          "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.0685956070001339,
+        "stderr": "setup=0.0108914 parse=0.0100392 dedup_events=0.00139454 resolve=0.0182483 sessionize_aggregate=0.0153296 write_parquet=0.00601409 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0619754}\n",
+        "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 41,
+      "name": "partial_output_fallback",
+      "mutation": {
+        "window_extended_days": 40
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.07543230399983258,
+          "stderr": "[engine] fast\n[engine] fallback: window\nsetup=0.011234 parse=0.00998141 dedup_events=0.00141331 resolve=0.0230523 sessionize_aggregate=0.0154926 write_parquet=0.00593059 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0671725}\n",
+          "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.053196570999944015,
+          "stderr": "[engine] fast\n[engine] fallback: window\nsetup=0.0106089 parse=0.00485624 dedup_events=0.000936599 resolve=0.010113 sessionize_aggregate=0.0122039 write_parquet=0.00559323 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0443673}\n",
+          "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fallback",
+          "elapsed_seconds_diagnostic_only": 0.0619947749999028,
+          "stderr": "[engine] fast\n[engine] fallback: window\nsetup=0.012559 parse=0.00629577 dedup_events=0.000835351 resolve=0.0104005 sessionize_aggregate=0.0158284 write_parquet=0.00710779 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0530903}\n",
+          "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06571127500001239,
+        "stderr": "setup=0.0101016 parse=0.00993887 dedup_events=0.00143893 resolve=0.0171667 sessionize_aggregate=0.0149375 write_parquet=0.00592575 \n{\"user_rows\":12966,\"campaign_rows\":13928,\"sessions\":20367,\"events\":97511,\"revenue_cents\":42566331,\"elapsed_seconds\":0.0595706}\n",
+        "comparison": "user_daily: rows 12966 vs 12966; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13928 vs 13928; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 73,
+      "name": "normal",
+      "mutation": {},
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.02041137800006254,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.7 s.mmap=0.9 s.sample=1.4 maps+keys=0.2 lookups=0.0 setup=0.0 parse=7.7 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=4.2 stitch=0.0 ev3b=0.1 c.pre=0.0 write=2.7 total=17.9 peak_rss_kb=47580\n[v2b] prof (thread-ms): scatter=0.5 compact=0.3 runs=3.1 st2b=1.1 st2b_max_bucket=1.1 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.4\n[v2b] rows: events=104715 clicks=25472 links=5088 | kept valid: simple=93793 complex=2391 odd=1781 | runs=3333 sessions=19868 user_rows=12805 uf_nodes=745 cx_users=33 joined=8 nb=8 nub=3\n[v2b] exit at 17.9 ms\n",
+          "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.02049705699982951,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.7 s.mmap=2.3 s.sample=0.1 maps+keys=0.2 lookups=0.0 setup=0.0 parse=3.2 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=7.0 stitch=0.0 ev3b=0.1 c.pre=0.0 write=3.6 total=17.2 peak_rss_kb=121928\n[v2b] prof (thread-ms): scatter=1.9 compact=0.2 runs=17.2 st2b=0.9 st2b_max_bucket=0.9 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=104715 clicks=25472 links=5088 | kept valid: simple=93793 complex=2391 odd=1781 | runs=3333 sessions=19868 user_rows=12805 uf_nodes=745 cx_users=33 joined=8 nb=8 nub=3\n[v2b] exit at 17.2 ms\n",
+          "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.03601361999994879,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.7 s.mmap=3.1 s.sample=0.1 maps+keys=0.2 lookups=0.0 setup=0.0 parse=7.2 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=11.1 stitch=0.0 ev3b=2.3 c.pre=0.0 write=8.3 total=33.0 peak_rss_kb=223396\n[v2b] prof (thread-ms): scatter=2.8 compact=0.2 runs=46.0 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.6 st2b_sort=0.2\n[v2b] rows: events=104715 clicks=25472 links=5088 | kept valid: simple=93793 complex=2391 odd=1781 | runs=3333 sessions=19868 user_rows=12805 uf_nodes=745 cx_users=33 joined=8 nb=8 nub=3\n[v2b] exit at 33.0 ms\n",
+          "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.06700525099995502,
+        "stderr": "setup=0.01079 parse=0.0101073 dedup_events=0.00144809 resolve=0.0182689 sessionize_aggregate=0.0148277 write_parquet=0.00550018 \n{\"user_rows\":12805,\"campaign_rows\":13524,\"sessions\":19868,\"events\":97965,\"revenue_cents\":35236613,\"elapsed_seconds\":0.0609964}\n",
+        "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    },
+    {
+      "seed": 73,
+      "name": "shuffled",
+      "mutation": {
+        "rows_shuffled": 135368
+      },
+      "runs": [
+        {
+          "threads": 1,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.017757673000005525,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.7 s.mmap=0.8 s.sample=1.4 maps+keys=0.2 lookups=0.0 setup=0.0 parse=6.6 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=4.0 stitch=0.0 ev3b=0.1 c.pre=0.0 write=2.3 total=16.0 peak_rss_kb=47644\n[v2b] prof (thread-ms): scatter=0.5 compact=0.3 runs=3.1 st2b=1.0 st2b_max_bucket=1.0 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.2\n[v2b] rows: events=104715 clicks=25472 links=5088 | kept valid: simple=93793 complex=2391 odd=1781 | runs=3333 sessions=19868 user_rows=12805 uf_nodes=745 cx_users=33 joined=8 nb=8 nub=3\n[v2b] exit at 16.1 ms\n",
+          "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 4,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.02281726699993669,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.8 s.mmap=1.8 s.sample=0.0 maps+keys=0.2 lookups=1.8 setup=0.0 parse=3.4 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=6.7 stitch=0.0 ev3b=1.5 c.pre=0.0 write=1.9 total=18.2 peak_rss_kb=138964\n[v2b] prof (thread-ms): scatter=2.3 compact=0.2 runs=15.6 st2b=1.0 st2b_max_bucket=1.0 st2b_pass1=0.1 st2b_pass2=0.7 st2b_sort=0.2\n[v2b] rows: events=104715 clicks=25472 links=5088 | kept valid: simple=93793 complex=2391 odd=1781 | runs=3333 sessions=19868 user_rows=12805 uf_nodes=745 cx_users=33 joined=8 nb=8 nub=3\n[v2b] exit at 18.2 ms\n",
+          "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "threads": 8,
+          "exit_code": 0,
+          "mode": "fast",
+          "elapsed_seconds_diagnostic_only": 0.036892336999926556,
+          "stderr": "[engine] fast\n[v2b] ms: s.list=0.6 s.mmap=2.4 s.sample=0.0 maps+keys=0.2 lookups=0.0 setup=0.0 parse=9.9 st2b=0.0 st2a=0.0 st2sort=0.0 ev3a=8.5 stitch=0.0 ev3b=2.3 c.pre=0.0 write=9.3 total=33.3 peak_rss_kb=204700\n[v2b] prof (thread-ms): scatter=2.6 compact=0.3 runs=36.2 st2b=0.8 st2b_max_bucket=0.8 st2b_pass1=0.1 st2b_pass2=0.5 st2b_sort=0.2\n[v2b] rows: events=104715 clicks=25472 links=5088 | kept valid: simple=93793 complex=2391 odd=1781 | runs=3333 sessions=19868 user_rows=12805 uf_nodes=745 cx_users=33 joined=8 nb=8 nub=3\n[v2b] exit at 33.3 ms\n",
+          "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "baseline": {
+        "exit_code": 0,
+        "mode": "unknown",
+        "elapsed_seconds_diagnostic_only": 0.0648310260000926,
+        "stderr": "setup=0.0104448 parse=0.0101308 dedup_events=0.00137289 resolve=0.0169666 sessionize_aggregate=0.0141639 write_parquet=0.00564585 \n{\"user_rows\":12805,\"campaign_rows\":13524,\"sessions\":19868,\"events\":97965,\"revenue_cents\":35236613,\"elapsed_seconds\":0.0587839}\n",
+        "comparison": "user_daily: rows 12805 vs 12805; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13524 vs 13524; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+      }
+    }
+  ],
+  "run_count": 48,
+  "mode_counts": {
+    "fast": 33,
+    "fallback": 15
+  },
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44956950677",
+  "validated_source_commit": "973221fbfa142a5c6822904105b9a4f9f934fe84"
+}

@@ -25,6 +25,43 @@ CPU. `SS_ENGINE_TRACE=1` reports selection and any fallback on stderr. Build wit
 `docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .`; native macOS builds
 continue to use C++.
 
+The latest production Docker build uses compile-time **`XL_BB=14`**, reducing each
+event partition's slot array from 512 KiB to 256 KiB. On an Intel Xeon 6975P-C
+runner with **four pinned logical CPUs spanning two physical cores, 12 GiB and no
+swap**, this produced a small improvement on both 20M inputs against `fd56b794`:
+
+| Official generated input | Pairs | Previous fast engine | `XL_BB=14` | Runtime change |
+| --- | ---: | ---: | ---: | ---: |
+| 20M events / 5M clicks, seed 17 | 5 | 0.346031 s | **0.341081 s** | **1.43% faster** |
+| 20M events / 5M clicks, seed 8675309 | 5 | 0.345152 s | **0.342634 s** | **0.73% faster** |
+| 60M events / 15M clicks, seed 948307 | 3 | **0.904092 s** | 0.910598 s | **0.72% slower** |
+
+These are medians of alternating fresh-container runs, from container start through
+exit. The candidate was faster in 5/5, 4/5 and 1/3 pairs, respectively. Both complete
+output tables matched exactly in **all 13 pairs**; all samples were retained and
+caches were not flushed. The 60M regression limits the improvement to the tested
+20M workloads. These CI results do not establish a portal runtime below 0.30 s.
+
+Ten screening configurations passed output comparison; `XL_BB=14` had the best
+screening median and was selected for the independent holdout comparisons above.
+Inlining purchase parsing was slower and remains disabled, as do direct click
+indexing and batched release. The selected build passed **36 official fixtures**,
+**48 differential checks** against the Python reference (**33 fast, 15 fallback**),
+and the **official public 1M golden answer at one and eight threads**. The expanded
+checks include duplicate and permuted click IDs, purchase price boundaries,
+unknown products and quoted fields.
+
+Measured source: [`973221f`](https://github.com/toM0dots/shopping-sessions-baseline/commit/973221fbfa142a5c6822904105b9a4f9f934fe84)
+compiled with `XL_BB=14`, in [CI run 44956950677](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44956950677).
+See the [paired measurements](logs/linux-selected-parser-paired.json),
+[selection](logs/fast-parser-selection.json), [screening results](logs/linux-fast-parser-sweep.json),
+[differential validation](logs/generator-selected-parser-validation.json), and
+[public golden validation](logs/public-selected-parser-validation.json).
+The [release manifest](logs/fast-release-selection.json) pins the measured binary's
+SHA-256 (`696661fb73cd0fc86ea74a7cf132158da99f8924261d4fe5f5eead2b3f09e459`);
+verification of the release build against that binary is pending.
+
+The most recent verified portal measurement predates this tuning update.
 On the [Datathon portal](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions),
 submission **`BB-1408C9EE`** at
 [`fd56b794`](https://github.com/toM0dots/shopping-sessions-baseline/commit/fd56b794f7efe74bcb4e8d32bd653f4df923c7fb)
@@ -37,7 +74,7 @@ scored **1.37 s**. The portal accepted the corrected submission, but did not exp
 individual timings, detailed correctness results or engine-selection logs.
 See [`logs/portal-generator-fastpath.json`](logs/portal-generator-fastpath.json).
 
-The verified production source is [`98d5116`](https://github.com/toM0dots/shopping-sessions-baseline/commit/98d51161f0cfbcd6364e3ae513e6a00fbf2ec77d).
+The original fast-engine comparison used source [`98d5116`](https://github.com/toM0dots/shopping-sessions-baseline/commit/98d51161f0cfbcd6364e3ae513e6a00fbf2ec77d).
 On an Intel Xeon 6975P-C Linux runner, with **four pinned logical CPUs, 12 GiB and no
 swap**, alternating fresh-container runs produced these medians:
 
@@ -104,6 +141,40 @@ python scripts/benchmark_fastpath.py --generator build/fastpath-ci/generator-tar
 
 Install `requirements-dev.txt` and Rust/Cargo for the verification tools. The container
 itself does not use Python or build anything during its timed execution.
+
+## Tuning follow-up: first round
+
+The first tuning round at [`291a066`](https://github.com/toM0dots/shopping-sessions-baseline/commit/291a066f8f78b317bfe2351509bc64b97ded64b8)
+found **no consistent improvement on either 20M input**. Seven experiments, including
+a diagnostic profile, retained all **56 alternating container pairs** on an AMD EPYC
+9V45 with four pinned logical CPUs spanning two physical cores, 12 GiB and no swap.
+Both complete output tables matched in every pair. These are separate CI measurements;
+the verified portal result remains **0.31 s at `fd56b794`**.
+
+- Core-first CPU placement was essentially unchanged: **0.25818 → 0.25816 s** and
+  **0.25240 → 0.25134 s** for the two 20M seeds.
+- Direct click indexing was slightly slower: **0.25910 → 0.26114 s** and
+  **0.25657 → 0.26126 s**. Using two workers instead of four was **18–21% slower**.
+- Releasing input mappings in batches of eight had mixed 20M results. Its apparent
+  **8.4% reduction at 60M** came from only two pairs, with a slow baseline sample;
+  this does not establish a repeatable improvement.
+
+Direct click indexing and batched release remain disabled by default
+(`XL_CKIX=0`, `XL_REL_BATCH=1`). This round alone was not promoted; core-first
+placement was retained for the subsequent parser experiments reported above.
+Raw samples, environment settings, comparisons and diagnostic output are retained in
+`logs/linux-fast-tuning-round1-*.json`.
+[Completed CI run](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44954335639).
+
+All **135 differential checks** passed against the independent Python reference:
+[default candidate](logs/generator-tuning-round1-default.json),
+[click indexing](logs/generator-tuning-round1-click-index.json), and
+[combined indexing, batched release and pread](logs/generator-tuning-round1-combined-pread.json).
+The 45 runs per configuration include duplicate clicks across files and permuted
+click IDs, alongside the earlier holdouts and mutations. The official public 1M
+golden answer also matched at one and eight threads for both the
+[default candidate](logs/public-tuning-round1-default.json) and
+[click-index candidate](logs/public-tuning-round1-click-index.json).
 
 ## Previous update: measured against the latest merged code (v8)
 

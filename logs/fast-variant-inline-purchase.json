@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "status": "built",
+  "settings": {
+    "XL_INLINE_PURCHASE": "1"
+  },
+  "variant_tag": "shopping-sessions:inline-purchase",
+  "base_reference": "shopping-sessions:ci",
+  "source_commit": "973221fbfa142a5c6822904105b9a4f9f934fe84",
+  "source_dirty_status": "",
+  "notes": "CI experiment only. Production source and Dockerfile are not modified. Only the fast binary is overlaid on a stopped container from the pinned base image.",
+  "base_image_id": "sha256:66af54dcbeba2fae3f1e5b762b896f6e407a45c872f7be3408c665d8c0837475",
+  "preserved_runtime_config": {
+    "Entrypoint": null,
+    "Cmd": [
+      "/app/run.sh"
+    ],
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "User": "",
+    "WorkingDir": "/app"
+  },
+  "source_sha256": {
+    "fast/.cargo/config.toml": "6a771770bb73c76931f06b3ea040725c453090e093189fa5d87224fe7bfbe261",
+    "fast/Cargo.lock": "626b3473685c5d5db07778f5d46cca25daeea2d51cffdc67cb0945ba182d90f2",
+    "fast/Cargo.toml": "325fdc366fde7d1b1ab944be42390067d8eb1a4e6166a22a0daa69d64bb36f96",
+    "fast/LICENSE": "ccef2155bc46e17ef8502d16ab2f26edb8c3ceddbcd332a5c4f1dd5b3df3be08",
+    "fast/src/affinity.rs": "1f4f0319bc4c756e8f5f64eb2853b2ef4bdfcac313d2ad8289d299ea0d8fc84c",
+    "fast/src/ckix.rs": "f187cf3efd25b75c3337f696d98b976a26aa684a22f0aa672f6672cf8f904f0b",
+    "fast/src/complex.rs": "5eb263b406f44db022a442cd94edd000039492f83266adfdc64eccd8db17dd8b",
+    "fast/src/core.rs": "06479a1d378ab3b0ec26a99a033b7fe28e9d252ec77d408ea08e9ac3979e341c",
+    "fast/src/events.rs": "e96f8f117eff4b5872fa59687f4df074bfac2f7fd582982001f56e06066b18e8",
+    "fast/src/fallback.rs": "f0b2d0d43e39ae0ffa16e5ca70f0cd97b4b18497bb0b306a0b129d594b98950c",
+    "fast/src/generic/core.rs": "78bb207b3873092773352a50e12714e38374e6ae097fa7afa09cbe5b58a90158",
+    "fast/src/generic/mod.rs": "6bee91343f386e1631bf7b6e834afddb805c652c3b36b1d7f596fe08864e1423",
+    "fast/src/generic/parse.rs": "66bb1fb52c3950839280dc20c84fc2e38e9c5278f81248cd554400224932b5a4",
+    "fast/src/generic/util.rs": "260d119806b6dcdaec588cc9f3c67da78b13625b3b5cf400e780ad498894f698",
+    "fast/src/iface.rs": "ca93486c5fb5c1e9a8caa0801b5d908f089c87d539e085e3a3955b7abe642a86",
+    "fast/src/input_release.rs": "0cbcd056b5d53ae37ba762649370085fb30df95abcbbe63fbde83b5f2fa1fee2",
+    "fast/src/k_free.rs": "83cc450d86ebeef349be0299a12c669fa987cb5f6bd1defdf8d02cd75e821b92",
+    "fast/src/k_ref.rs": "367df6ab8be30d6e85b57f604216019fb17b9be64fa0f1d0bfd36ff9275f1e29",
+    "fast/src/keyrec.rs": "6be02b6e2c3071c39b1a49cdf77b46a513ee0b0874702a070c5b234d5733bf84",
+    "fast/src/links.rs": "2b778a34a987fbaf952f7089efbcf18947b8eb570160a95857826b52828f92aa",
+    "fast/src/main.rs": "5cc9024357fd6ed8d7519fbfc841fdbc7f425a6c4f5cda98873aa328303c0552",
+    "fast/src/out.rs": "fae8704a2298947692c67806c111dd8f97aef222cf33c504491f737c37d4096e",
+    "fast/src/parse.rs": "b5663aa9c618595d34da983e4cbb1d7f4650f0a0d73d2fb428b34c73c8d9db5d",
+    "fast/src/pqw.rs": "99488d524fe46cccc666fb457df1e7b3d72090e22179851ea78664137e00acaf",
+    "fast/src/setup.rs": "b0be72152cf0e0eec0033dd7dc56754c4d952723dfaabec0b8b7ffc0ebbde995",
+    "fast/src/sys.rs": "b0e4f5b9ad5763659bf4600a02be8709d3d65db6a8a4dd20b5624957723adaef"
+  },
+  "builder_dockerfile": "# The fast engine is Linux amd64 only. Other platforms still build the C++\n# engine below and receive an empty fast-engine directory.\nFROM rust:1.100.0-alpine AS fast-builder\nRUN apk add --no-cache musl-dev\nWORKDIR /src\nCOPY fast/Cargo.toml fast/Cargo.lock ./\nCOPY fast/.cargo .cargo\nCOPY fast/src src\nCOPY fast/LICENSE /usr/share/doc/shopping-sessions-fast/LICENSE\nENV XL_INLINE_PURCHASE=1\nRUN mkdir -p /fast-bin \\\n    && if [ \"$(uname -m)\" = x86_64 ]; then \\\n        cargo build --locked --release --target x86_64-unknown-linux-musl \\\n        && cp target/x86_64-unknown-linux-musl/release/pipeline /fast-bin/shopping-sessions-fast; \\\n    fi\n\n# Build at image-build time, never inside the timed execution. Unused Arrow\n# components are excluded; the native binary links Arrow/Parquet statically.\n\nRUN test -s /fast-bin/shopping-sessions-fast && test -x /fast-bin/shopping-sessions-fast\n",
+  "rust_config": "[build]\n# PKU is unused and can be masked on otherwise compatible virtual CPUs.\n# Keep this feature contract synchronized with pipeline/dispatch.cpp.\nrustflags = [\"-C\", \"target-cpu=cascadelake\", \"-C\", \"target-feature=-pku\", \"-C\", \"relocation-model=static\", \"-C\", \"llvm-args=-x86-branches-within-32B-boundaries\", \"-C\", \"llvm-args=-x86-pad-max-prefix-size=5\"]\n",
+  "builder_image_id": "sha256:f82c83a329ed7cd393123266d303855574c5463d453af8560031f7c646bc317b",
+  "fast_binary_sha256": "d2b20a3c5a2847cce1afce762babd34fc76787f070dab7ec0d172de5c06a05c4",
+  "fast_binary_bytes": 2617872,
+  "fast_binary_path": "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/build/fast-variants/shopping-sessions_inline-purchase/shopping-sessions-fast",
+  "runtime_filesystem_changes": [
+    "C /app",
+    "C /app/build",
+    "C /app/build/shopping-sessions-fast"
+  ],
+  "variant_image_id": "sha256:d57ca22b3d43e04647d5ad7b71cd7cb186b855ef4bc90f71af07a7d28e12b623",
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44956950677",
+  "validated_source_commit": "973221fbfa142a5c6822904105b9a4f9f934fe84"
+}
