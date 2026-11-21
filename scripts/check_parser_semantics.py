@@ -37,13 +37,23 @@ reference = functions(reference)
 # expression to retain its intended arithmetic without contaminating UBSan.
 reference = reference.replace("n = n * 10 + c - '0';", "n = n * 10 + (c - '0');")
 candidate = functions(candidate)
+# A separate instrumented namespace verifies that valid F1 values actually use
+# the fast path. Differential equality alone misses a disabled optimization
+# when the general fallback remains correct (for example, a bad separator mask).
+general_definition = "static I64 timestamp_general(SV s) {"
+if candidate.count(general_definition) != 1:
+    parser.error("expected one timestamp_general definition for fast-path coverage")
+probe = candidate.replace(general_definition,
+                          general_definition + "\n    ++general_fallbacks;", 1)
 HEADER = r'''
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#if defined(__SSE2__)
+#if defined(__x86_64__)
+#include <immintrin.h>
+#elif defined(__SSE2__)
 #include <emmintrin.h>
 #endif
 #include <iostream>
@@ -75,6 +85,26 @@ bool check_time(const std::string &s) {
     return true;
 }
 int main() {
+    size_t fast_cases = 0;
+    for (const std::string s : {"2024-02-29T00:00:00Z", "2024-02-29T12:34:56Z",
+                               "2024-03-01T23:59:59Z", "1900-02-28T01:02:03Z",
+                               "2000-02-29T00:00:00Z", "0001-01-01T00:00:00Z",
+                               "9999-12-31T23:59:59Z", "1970-01-01T00:00:00Z"}) {
+        fast_probe::general_fallbacks = 0;
+        if (fast_probe::timestamp(s) != old::timestamp(s) || fast_probe::general_fallbacks) {
+            std::cerr << "F1 fast path inactive or incorrect: " << s << '\n';
+            return 1;
+        }
+        ++fast_cases;
+    }
+    // Positive controls prove that the probe observes calls into the fallback.
+    for (const std::string s : {"2027-06-17T12:34:56+02:30", "00000000000000000000000000123"}) {
+        fast_probe::general_fallbacks = 0;
+        if (fast_probe::timestamp(s) != old::timestamp(s) || !fast_probe::general_fallbacks) {
+            std::cerr << "General fallback probe inactive or incorrect: " << s << '\n';
+            return 1;
+        }
+    }
     std::string alphabet="abXYZ0123 ,\"\n\r\t";
     alphabet.push_back('\0'); alphabet.push_back(char(0x80)); alphabet.push_back(char(0xff));
     size_t csv_cases=0, stamp_cases=0;
@@ -148,14 +178,16 @@ int main() {
             if(!check_time(changed))return 1;
             stamp_cases+=2;
         }
-    std::cout<<"PASS "<<csv_cases<<" CSV comparisons; "<<stamp_cases<<" timestamp comparisons\n";
+    std::cout<<"PASS "<<csv_cases<<" CSV comparisons; "<<stamp_cases<<" timestamp comparisons; "
+             <<fast_cases<<" F1 fast-path coverage checks and 2 fallback controls\n";
 }
 '''
 with tempfile.TemporaryDirectory(prefix="shopping-parser-check-") as tmp:
     source = Path(tmp) / "check.cpp"
     binary = Path(tmp) / "check"
     source.write_text(HEADER + "namespace old {\n" + reference + "}\n" +
-                      "namespace updated {\n" + candidate + "}\n" + CASES)
+                      "namespace updated {\n" + candidate + "}\n" +
+                      "namespace fast_probe {\nstatic uint64_t general_fallbacks = 0;\n" + probe + "}\n" + CASES)
     flags = ["-std=c++17", "-O1", "-g"]
     if not args.no_sanitizers:
         flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all"]

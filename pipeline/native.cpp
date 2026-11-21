@@ -662,50 +662,53 @@ static I64 timestamp(SV s) {
         return ok ? head * 100000000 + I64(digits8_value(tail)) : BAD;
     }
     if (s.size() == 20 && s[19] == 'Z') {
-        // F1 YYYY-MM-DDTHH:MM:SSZ. Separators are checked, then replaced by
-        // '0' so all three words can be checked as digits at once.
-        uint64_t a, b, c;
-        std::memcpy(&a, s.data(), 8);      // YYYY-MM-
-        std::memcpy(&b, s.data() + 8, 8);  // DDTHH:MM
-        std::memcpy(&c, s.data() + 12, 8); // H:MM:SSZ
-        constexpr uint64_t SEP_A = 0xFF0000FF00000000ULL, // bytes 4, 7
-                           SEP_B = 0x0000FF0000FF0000ULL, // bytes 2, 5
-                           SEP_C = 0xFF000000FF00FF00ULL; // bytes 1, 4, 7
+        // A cache hit identifies all ten already-validated YYYY-MM-DD bytes.
+        // Only the time portion needs validation again. A miss still validates
+        // every date character, separator and calendar limit before caching.
+        uint64_t prefix, clock;
+        uint16_t suffix;
+        std::memcpy(&prefix, s.data(), 8);      // YYYY-MM-
+        std::memcpy(&suffix, s.data() + 8, 2); // DD
+        std::memcpy(&clock, s.data() + 12, 8); // H:MM:SSZ
+        constexpr uint64_t SEP_A = 0xFF0000FF00000000ULL,
+                           SEP_C = 0xFF0000FF0000FF00ULL;
         constexpr uint64_t WANT_A = uint64_t('-') << 32 | uint64_t('-') << 56,
-                           WANT_B = uint64_t('T') << 16 | uint64_t(':') << 40,
                            WANT_C = uint64_t(':') << 8 | uint64_t(':') << 32 | uint64_t('Z') << 56;
         constexpr uint64_t ZEROS = 0x3030303030303030ULL;
-        if ((a & SEP_A) == WANT_A && (b & SEP_B) == WANT_B && (c & SEP_C) == WANT_C &&
-            all_digits8((a & ~SEP_A) | (ZEROS & SEP_A)) && all_digits8((b & ~SEP_B) | (ZEROS & SEP_B)) &&
-            all_digits8((c & ~SEP_C) | (ZEROS & SEP_C))) {
-            auto d = [&](int i) { return int(uint8_t(s[i]) - '0'); };
-            int y = d(0) * 1000 + d(1) * 100 + d(2) * 10 + d(3), m = d(5) * 10 + d(6),
-                day = d(8) * 10 + d(9), h = d(11) * 10 + d(12), mi = d(14) * 10 + d(15),
-                sec = d(17) * 10 + d(18);
-            struct DateEntry {
-                uint64_t prefix = 0;
-                uint16_t suffix = 0;
-                I64 midnight = BAD;
-            };
-            static thread_local std::array<DateEntry, 32> dates;
-            uint16_t suffix;
-            std::memcpy(&suffix, s.data() + 8, sizeof(suffix));
-            auto &entry = dates[unsigned(day) & 31];
-            I64 midnight;
-            if (entry.prefix == a && entry.suffix == suffix && entry.midnight != BAD)
-                midnight = entry.midnight;
-            else {
-                static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-                if (y < 1 || m < 1 || m > 12 || day < 1 ||
-                    day > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
-                    return BAD;
-                midnight = days_from_civil(y, unsigned(m), unsigned(day)) * DAY;
-                entry = {a, suffix, midnight};
-            }
-            if (h > 23 || mi > 59 || sec > 59)
+        unsigned hour_tens = unsigned(uint8_t(s[11])) - '0';
+        if (s[10] != 'T' || hour_tens > 2 || (clock & SEP_C) != WANT_C ||
+            !all_digits8((clock & ~SEP_C) | (ZEROS & SEP_C)))
+            return BAD;
+        auto d = [&](int i) { return int(uint8_t(s[i]) - '0'); };
+        int h = int(hour_tens) * 10 + d(12), mi = d(14) * 10 + d(15), sec = d(17) * 10 + d(18);
+        if (h > 23 || mi > 59 || sec > 59)
+            return BAD;
+        struct DateEntry {
+            uint64_t prefix = 0;
+            uint16_t suffix = 0;
+            I64 midnight = BAD;
+        };
+        static thread_local std::array<DateEntry, 32> dates;
+        auto &entry = dates[(unsigned(uint8_t(s[8])) * 10 + uint8_t(s[9])) & 31];
+        I64 midnight;
+        if (entry.prefix == prefix && entry.suffix == suffix && entry.midnight != BAD)
+            midnight = entry.midnight;
+        else {
+            unsigned day_tens = unsigned(uint8_t(s[8])) - '0';
+            unsigned day_ones = unsigned(uint8_t(s[9])) - '0';
+            if ((prefix & SEP_A) != WANT_A || !all_digits8((prefix & ~SEP_A) | (ZEROS & SEP_A)) ||
+                day_tens > 3 || day_ones > 9)
                 return BAD;
-            return midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
+            int y = d(0) * 1000 + d(1) * 100 + d(2) * 10 + d(3), m = d(5) * 10 + d(6),
+                day = int(day_tens * 10 + day_ones);
+            static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+            if (y < 1 || m < 1 || m > 12 || day < 1 ||
+                day > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+                return BAD;
+            midnight = days_from_civil(y, unsigned(m), unsigned(day)) * DAY;
+            entry = {prefix, suffix, midnight};
         }
+        return midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
     }
     return timestamp_general(s);
 }
@@ -1046,8 +1049,8 @@ struct ClickRec {
     uint32_t campaign;
 };
 static_assert(sizeof(EventRec) == 16 && sizeof(DedupRec) == 24 && sizeof(ClickRec) == 32);
-// After interning, each person's records are grouped by a counting sort and
-// only the short per-person runs are ordered by time.
+// After interning, a stable counting sort groups records by person. Events
+// retain coarse time-bucket order; clicks retain exact timestamp order.
 struct CompactEvent {
     I64 ts;
     int cents;
@@ -1713,7 +1716,7 @@ static int run() {
             auto &piece_e = piece_events[job / PIECES][job % PIECES];
             auto &piece_c = piece_clicks[job / PIECES][job % PIECES];
             // Intern persons, then group each person's records contiguously with
-            // a counting sort; only the per-person runs are sorted by time.
+            // a stable counting sort after ordering the piece by time or time bucket.
             constexpr uint32_t NONE = UINT32_MAX;
             PersonTable people_here(piece_e.size() / 8 + 16);
             gathered.clear();
@@ -1727,11 +1730,14 @@ static int run() {
                 gathered.push_back({people_here.intern({e.person, e.person.hash()}), ce});
             });
             piece_e.release();
-            // Radix-sort the piece by time; the stable counting sort by person
-            // below then leaves every person's events in time order.
+            // Every event inside a 30-minute bucket is connected: its largest
+            // possible gap is strictly below the session threshold. Sort coarse
+            // buckets instead of individual milliseconds; the stable person
+            // grouping then keeps each person's buckets contiguous and ordered.
+            constexpr uint64_t SESSION_GAP = 1800000;
             event_scratch.reserve(gathered.size());
-            radix_sort(gathered, event_scratch, uint64_t(hi - 1 - lo),
-                       [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo); });
+            radix_sort(gathered, event_scratch, uint64_t(hi - 1 - lo) / SESSION_GAP,
+                       [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo) / SESSION_GAP; });
             size_t np = people_here.size();
             // Reserve the input-derived size before resizing, so these buffers
             // need not grow geometrically beyond the largest observed piece.
@@ -1813,27 +1819,50 @@ static int run() {
                     active_counts[c] = 0;
                 active.clear();
                 size_t left = ci, right = ci;
+                struct Bucket {
+                    size_t end;
+                    I64 first, last;
+                };
+                auto summarize = [&](size_t begin) {
+                    I64 first = events[begin].ts, last = first;
+                    uint64_t bucket = uint64_t(first - lo) / SESSION_GAP;
+                    size_t next = begin + 1;
+                    while (next < end && uint64_t(events[next].ts - lo) / SESSION_GAP == bucket) {
+                        first = std::min(first, events[next].ts);
+                        last = std::max(last, events[next].ts);
+                        ++next;
+                    }
+                    return Bucket{next, first, last};
+                };
+                Bucket current = summarize(at);
                 while (at < end) {
-                    int32_t day = floor_day(events[at].ts);
-                    // Events are in time order, so this day lasts until day_end.
+                    int32_t day = floor_day(current.first);
+                    // A bucket is connected internally. Between buckets, the
+                    // exact last-to-first gap decides whether the session ends.
                     I64 day_end = (I64(day) + 1) * DAY;
                     UserRow row{people_here.name(person), day, 0, 0, 0, -1};
                     do {
-                        I64 start = events[at].ts, previous = start, rev = 0;
-                        size_t j = at;
-                        do {
-                            auto &e = events[j];
-                            previous = e.ts;
-                            rev += e.cents;
-                            if (e.cents) {
-                                if (!category_revenue[e.category])
-                                    touched.push_back(e.category);
-                                category_revenue[e.category] += e.cents;
+                        I64 start = current.first, rev = 0;
+                        size_t session_begin = at;
+                        for (;;) {
+                            for (; at < current.end; ++at) {
+                                auto &e = events[at];
+                                rev += e.cents;
+                                if (e.cents) {
+                                    if (!category_revenue[e.category])
+                                        touched.push_back(e.category);
+                                    category_revenue[e.category] += e.cents;
+                                }
                             }
-                            ++j;
-                        } while (j < end && events[j].ts - previous <= 1800000);
+                            I64 previous = current.last;
+                            if (at == end)
+                                break;
+                            current = summarize(at);
+                            if (current.first - previous > I64(SESSION_GAP))
+                                break;
+                        }
                         ++row.sessions;
-                        row.events += j - at;
+                        row.events += at - session_begin;
                         row.revenue += rev;
                         while (right < ce && clicks[right].ts <= start) {
                             auto c = clicks[right++].campaign;
@@ -1858,8 +1887,7 @@ static int run() {
                         stat.revenue += rev;
                         for (auto c : active)
                             ++daily.get(c, day).assists;
-                        at = j;
-                    } while (at < end && events[at].ts < day_end);
+                    } while (at < end && current.first < day_end);
                     // Highest revenue, ties to the byte-wise smallest category.
                     for (auto c : touched)
                         if (row.category < 0 || category_revenue[c] > category_revenue[row.category] ||

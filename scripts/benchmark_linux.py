@@ -25,7 +25,7 @@ import time
 import urllib.request
 import zipfile
 
-BASELINE_REF = "c330a0494b304029e28d5bae370c6efff6049cb8"
+BASELINE_REF = "c0bcee19170616f31e54656a65466e37aca8255d"
 GENERATOR_URL = "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/generator.zip"
 GENERATOR_SHA = "13724cadbac5a99d847e27cea911cd2e338ff972b46c2039da87452011bb101e"
 
@@ -156,7 +156,7 @@ def main():
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--memory", default="12g")
     parser.add_argument("--platform", default="linux/amd64")
-    parser.add_argument("--report", type=Path, default=Path("logs/linux-v8-final-20m.json"))
+    parser.add_argument("--report", type=Path, default=Path("logs/linux-v9-final-20m.json"))
     args = parser.parse_args()
     if args.rounds < 1 or args.threads < 1:
         parser.error("rounds and threads must be positive")

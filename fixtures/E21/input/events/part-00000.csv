@@ -1,0 +1,5 @@
+event_id,user_id,ts,ingest_ts,event_type,product_id,price_cents
+e_late,ualias,2026-10-02T00:05:00Z,2026-10-02T00:06:00Z,purchase,p1,300
+e_mid,u1,2026-10-02T00:00:00Z,2026-10-02T00:01:00Z,view,p1,
+e_early,u1,2026-10-01T23:55:00Z,2026-10-01T23:56:00Z,purchase,p2,200
+e_cart,ualias,2026-10-01T23:58:00Z,2026-10-01T23:59:00Z,cart,p1,
