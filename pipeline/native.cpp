@@ -261,6 +261,26 @@ template <size_t N, class F> void fast_rows(SV text, F f) {
         }
     }
 }
+// Buffers a few split rows so the caller can start fetching each row's
+// random-access lookups before processing the first of them.
+template <size_t N, class P, class F> void batched_rows(SV text, P prefetch, F f) {
+    constexpr size_t batch = 16;
+    std::array<std::array<SV, N>, batch> rows_buffer;
+    std::array<uint64_t, batch> keys;
+    size_t n = 0;
+    auto flush = [&] {
+        for (size_t i = 0; i < n; ++i)
+            f(rows_buffer[i], keys[i]);
+        n = 0;
+    };
+    fast_rows<N>(text, [&](auto &r) {
+        rows_buffer[n] = r;
+        keys[n] = prefetch(r);
+        if (++n == batch)
+            flush();
+    });
+    flush();
+}
 static I64 days_from_civil(int y, unsigned m, unsigned d) {
     y -= m <= 2;
     const int era = (y >= 0 ? y : y - 399) / 400;
@@ -524,8 +544,13 @@ class Identity {
                     e.canon = best[parent[e.canon]].load(std::memory_order_relaxed);
         });
     }
-    PersonRef person(SV s) const {
-        uint64_t hash = Hash{}(s);
+    void prefetch(uint64_t hash) const {
+        auto &sh = shards[hash & (SHARDS - 1)];
+        if (!sh.table.empty())
+            __builtin_prefetch(&sh.table[index(hash, sh.mask)]);
+    }
+    PersonRef person(SV s) const { return person(s, Hash{}(s)); }
+    PersonRef person(SV s, uint64_t hash) const {
         auto &sh = shards[hash & (SHARDS - 1)];
         if (sh.table.empty())
             return {s, hash};
@@ -574,6 +599,10 @@ struct CompactClick {
 // Shard-local person interning. Hashes were computed during parsing; full
 // names are still compared whenever hashes match, so grouping stays exact.
 class PersonTable {
+    // Linked IDs share one canonical name, so equal pointers avoid a cold read.
+    static bool same(SV a, SV b) {
+        return a.size() == b.size() && (a.data() == b.data() || a == b);
+    }
     struct Entry {
         uint64_t hash;
         SV name;
@@ -602,7 +631,7 @@ class PersonTable {
                 names.push_back(p.name);
                 return e.id;
             }
-            if (e.hash == p.hash && e.name == p.name)
+            if (e.hash == p.hash && same(e.name, p.name))
                 return e.id;
         }
         grow();
@@ -613,7 +642,7 @@ class PersonTable {
             auto &e = entries[i];
             if (e.id == UINT32_MAX)
                 return UINT32_MAX;
-            if (e.hash == p.hash && e.name == p.name)
+            if (e.hash == p.hash && same(e.name, p.name))
                 return e.id;
         }
     }
@@ -871,7 +900,14 @@ static int run() {
         timing("setup");
         std::vector<Partitions<RawEvent>> parsed(threads);
         parallel(event_jobs.size(), threads, [&](size_t job, size_t worker) {
-            fast_rows<7>(event_jobs[job], [&](auto &r) {
+            batched_rows<7>(
+                event_jobs[job],
+                [&](auto &r) {
+                    uint64_t hash = Hash{}(r[1]);
+                    people.prefetch(hash);
+                    return hash;
+                },
+                [&](auto &r, uint64_t person_hash) {
                 if (r[0].empty())
                     return;
                 Event event{{}, BAD, 0, 0};
@@ -893,7 +929,7 @@ static int run() {
                             if (product != products.end())
                                 category = product->second;
                         }
-                        event = {people.person(r[1]), ts, cents, category};
+                        event = {people.person(r[1], person_hash), ts, cents, category};
                     }
                 }
                 // Invalid winners must remain present until global ID deduplication.
@@ -924,7 +960,14 @@ static int run() {
         timing("dedup_events");
         std::vector<Partitions<Click>> parsed_clicks(threads);
         parallel(click_jobs.size(), threads, [&](size_t job, size_t worker) {
-            fast_rows<4>(click_jobs[job], [&](auto &r) {
+            batched_rows<4>(
+                click_jobs[job],
+                [&](auto &r) {
+                    uint64_t hash = Hash{}(r[1]);
+                    people.prefetch(hash);
+                    return hash;
+                },
+                [&](auto &r, uint64_t person_hash) {
                 if (r[0].empty() || r[1].empty())
                     return;
                 auto c = campaign_ids.find(r[2]);
@@ -936,7 +979,7 @@ static int run() {
                 // Click duplicates are identical after unquoting, so validation commutes.
                 uint64_t hash = Hash{}(r[0]);
                 parsed_clicks[worker][hash & (SHARDS - 1)].push_back(
-                    {r[0], people.person(r[1]), hash, ts, c->second});
+                    {r[0], people.person(r[1], person_hash), hash, ts, c->second});
             });
         });
         std::array<Partitions<Click>, SHARDS> click_parts;
