@@ -1142,7 +1142,11 @@ static void write_table(const fs::path &path, std::shared_ptr<arrow::Table> tabl
     fs::create_directories(path.parent_path());
     auto stream = unwrap(arrow::io::FileOutputStream::Open(path.string()));
     parquet::WriterProperties::Builder properties;
-    properties.compression(parquet::Compression::SNAPPY);
+    // Uncompressed, and no dictionary for user_id (nearly every value is
+    // distinct): encoding cost, not file size, is what is timed. The 20M
+    // output is about 37 MB this way.
+    properties.compression(parquet::Compression::UNCOMPRESSED);
+    properties.disable_dictionary("user_id");
     // Encode the columns of each row group concurrently; the file layout is unchanged.
     auto arrow_properties = parquet::ArrowWriterProperties::Builder().set_use_threads(true)->build();
     check(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), stream, 65536,
