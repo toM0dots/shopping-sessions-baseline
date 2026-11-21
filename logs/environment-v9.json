@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-21",
+  "os": "15.2",
+  "cpu": "Intel Core i5-1038NG7 @ 2.00GHz",
+  "physical_cores": 4,
+  "logical_cpus": 8,
+  "memory_bytes": 17179869184,
+  "python": "3.11.7",
+  "duckdb": "1.4.5",
+  "pyarrow": "19.0.1",
+  "polars": "1.38.1",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.3)",
+  "public_input_sha256_paths_and_bytes": "cb10a0509824f7500edb7289f8a5c7534da6a72610c7997501b13d314fbeea00",
+  "generator_seed": 1,
+  "requested_events": 1000000,
+  "requested_clicks": 250000,
+  "input_csv_bytes": 96210343,
+  "notes": "Local macOS comparisons against c0bcee1. Fresh processes/outputs, alternating order, no cache flushes or discarded samples. Agent compilation/tests stopped during timing. Exploratory screens are recorded separately; the worker-cache variant was not adopted. Linux CI is separate; none of these numbers measures the portal score.",
+  "baseline_commit": "c0bcee19170616f31e54656a65466e37aca8255d",
+  "arrow_linkage": "minimal static Arrow/Parquet 19.0.1; OS and C++ runtime libraries remain dynamic",
+  "arrow_source_archive_sha256": "4c898504958841cc86b6f8710ecb2919f96b5e10fa8989ac10ac4fca8362d86a",
+  "native_source_sha256": "54e8a51d76cbba41f565c9947e3c6dcd53895c03deb32092541b3e6e3f2d4c38",
+  "native_binary_sha256": "d7ca306241bdaf07d2c01634dd36c410ea30710192ddebb69dec1c23d8421ed0",
+  "baseline_binary_sha256": "2380032ec780d09118037b036eeb8ca03381bcc32f507ee8bd81d44f96a65bff",
+  "scale_input": {
+    "seed": 17,
+    "requested_events": 20000000,
+    "requested_clicks": 5000000,
+    "csv_bytes": 1921192469,
+    "output_user_rows": 2249563,
+    "output_campaign_rows": 28014,
+    "surviving_events": 19674814,
+    "sessions": 3416486,
+    "revenue_cents": 6029421427
+  },
+  "candidate_commit": "059f42f60740ebd1e7ca52a6733e219bb8e47327",
+  "pgo": "OFF locally (Apple Clang); Docker CI uses existing GCC PGO for both versions",
+  "key_validation": {
+    "commands": [
+      "python3 scripts/check_keys.py",
+      "python3 scripts/check_keys.py --scalar"
+    ],
+    "cases_each": 82513,
+    "pair_comparisons_each": 100000,
+    "guarded_buffer_lifetime_cases_each": 66,
+    "sanitizers": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer"
+    ]
+  },
+  "benchmark_harness_commit": "059f42f60740ebd1e7ca52a6733e219bb8e47327",
+  "parser_validation": {
+    "csv_comparisons_each": 361548,
+    "timestamp_comparisons_each": 203052,
+    "f1_fast_path_checks_each": 8,
+    "fallback_positive_controls_each": 2,
+    "modes": [
+      "SIMD",
+      "scalar"
+    ],
+    "sanitizers": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer"
+    ],
+    "regression_guard": "Original c0bcee1 source fails F1 fast-path coverage as expected."
+  },
+  "adoption": "Not adopted: Linux median regressed0.75%, local20M regressed5.6%; retain main c0bcee1."
+}

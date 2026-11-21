@@ -1,0 +1,83 @@
+--- a/pipeline/native.cpp
++++ b/pipeline/native.cpp
+@@ -644,10 +644,20 @@
+     return (((v & 0x000000FF000000FFULL) * (100 + (1000000ULL << 32))) +
+             (((v >> 16) & 0x000000FF000000FFULL) * (1 + (10000ULL << 32)))) >> 32;
+ }
++// One cache per parsing worker. Cache-line alignment keeps neighboring workers
++// independent, and the hot overload receives its cache without a TLS lookup.
++struct alignas(64) TimestampCache {
++    struct Entry {
++        uint64_t prefix = 0;
++        uint16_t suffix = 0;
++        I64 midnight = BAD;
++    };
++    std::array<Entry, 32> dates;
++};
+ static I64 timestamp_general(SV s);
+ // The common forms take fast paths with complete validation; anything else,
+ // valid or not, goes to timestamp_general, which decides it.
+-static I64 timestamp(SV s) {
++static I64 timestamp(SV s, TimestampCache &cache) {
+     if (s.size() == 13) {
+         // F3 milliseconds: 5 digits, then 8 decoded at once.
+         uint64_t tail;
+@@ -683,13 +693,7 @@
+         int h = int(hour_tens) * 10 + d(12), mi = d(14) * 10 + d(15), sec = d(17) * 10 + d(18);
+         if (h > 23 || mi > 59 || sec > 59)
+             return BAD;
+-        struct DateEntry {
+-            uint64_t prefix = 0;
+-            uint16_t suffix = 0;
+-            I64 midnight = BAD;
+-        };
+-        static thread_local std::array<DateEntry, 32> dates;
+-        auto &entry = dates[(unsigned(uint8_t(s[8])) * 10 + uint8_t(s[9])) & 31];
++        auto &entry = cache.dates[(unsigned(uint8_t(s[8])) * 10 + uint8_t(s[9])) & 31];
+         I64 midnight;
+         if (entry.prefix == prefix && entry.suffix == suffix && entry.midnight != BAD)
+             midnight = entry.midnight;
+@@ -711,6 +715,11 @@
+         return midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
+     }
+     return timestamp_general(s);
++}
++// Convenience entry point for the manifest and standalone parser checks.
++static I64 timestamp(SV s) {
++    static thread_local TimestampCache cache;
++    return timestamp(s, cache);
+ }
+ static I64 timestamp_general(SV s) {
+     if (s.empty())
+@@ -1471,7 +1480,9 @@
+         std::vector<Partitions<ClickRec>> clicks_by_user(threads);
+         // Events and clicks share one pool of chunk jobs: one barrier, and the
+         // last jobs of one kind no longer leave threads idle.
++        std::vector<TimestampCache> timestamp_caches(threads);
+         parallel(event_jobs.size() + click_jobs.size(), threads, [&](size_t job, size_t worker) {
++            auto &clock_cache = timestamp_caches[worker];
+             if (job >= event_jobs.size()) {
+                 fast_rows<4>(click_jobs[job - event_jobs.size()].resolve(), [&](auto &r) {
+                     if (r[0].empty() || r[1].empty())
+@@ -1479,7 +1490,7 @@
+                     auto c = campaign_ids.find(r[2]);
+                     if (!c)
+                         return;
+-                    I64 ts = timestamp(r[3]);
++                    I64 ts = timestamp(r[3], clock_cache);
+                     if (ts == BAD || ts < lo - REACH || ts >= hi)
+                         return;
+                     Key user = Key::of(r[1]);
+@@ -1494,10 +1505,10 @@
+                 // ingest_ts is guaranteed valid F1; integer ordering is the
+                 // same as its original lexical ordering. Reuse this parse for
+                 // lateness and deduplication, even for invalid winning events.
+-                I64 ingest = timestamp(r[3]);
++                I64 ingest = timestamp(r[3], clock_cache);
+                 bool valid = !r[1].empty() && !r[5].empty() &&
+                              (r[4] == "view" || r[4] == "cart" || r[4] == "purchase");
+-                I64 ts = valid ? timestamp(r[2]) : BAD;
++                I64 ts = valid ? timestamp(r[2], clock_cache) : BAD;
+                 if (ts != BAD && ts >= lo && ts < hi) {
+                     int cents = r[4] == "purchase" ? price(r[6]) : 0;
+                     if (ingest != BAD && ingest - ts <= DAY && (r[4] != "purchase" || cents)) {

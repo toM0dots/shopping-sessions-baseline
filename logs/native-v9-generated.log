@@ -1,0 +1,126 @@
+seed=2 events=1000 wide_window=False
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l1dcachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l2cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l3cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.sse4_2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx1_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx2_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi1'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512f'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512cd'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512dq'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512bw'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512vl'. Detail: [errno 1] Operation not permitted
+{"user_rows": 208, "campaign_rows": 507, "sessions": 270, "events": 979, "revenue_cents": 204651, "elapsed_seconds": 2.1669870640034787}
+setup=0.0481635 parse=0.00133142 dedup_events=0.00110363 resolve=0.00154117 sessionize_aggregate=0.00489928 write_parquet=0.00612633
+{"user_rows":208,"campaign_rows":507,"sessions":270,"events":979,"revenue_cents":204651,"elapsed_seconds":0.0634802}
+user_daily: rows 208 vs 208; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 507 vs 507; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+setup=0.0360618 parse=0.00110684 dedup_events=0.00065926 resolve=0.00115649 sessionize_aggregate=0.00713822 write_parquet=0.00415806
+{"user_rows":208,"campaign_rows":507,"sessions":270,"events":979,"revenue_cents":204651,"elapsed_seconds":0.0504246}
+user_daily: rows 208 vs 208; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 507 vs 507; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+seed=17 events=20000 wide_window=False
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l1dcachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l2cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l3cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.sse4_2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx1_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx2_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi1'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512f'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512cd'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512dq'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512bw'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512vl'. Detail: [errno 1] Operation not permitted
+{"user_rows": 2932, "campaign_rows": 4702, "sessions": 4705, "events": 19690, "revenue_cents": 3802545, "elapsed_seconds": 1.7318149420025293}
+setup=0.029313 parse=0.013862 dedup_events=0.0012173 resolve=0.00847807 sessionize_aggregate=0.00780638 write_parquet=0.00714279
+{"user_rows":2932,"campaign_rows":4702,"sessions":4705,"events":19690,"revenue_cents":3802545,"elapsed_seconds":0.0679391}
+user_daily: rows 2932 vs 2932; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 4702 vs 4702; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+setup=0.0421627 parse=0.00395741 dedup_events=0.00104144 resolve=0.00412919 sessionize_aggregate=0.0103536 write_parquet=0.00683556
+{"user_rows":2932,"campaign_rows":4702,"sessions":4705,"events":19690,"revenue_cents":3802545,"elapsed_seconds":0.0685886}
+user_daily: rows 2932 vs 2932; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 4702 vs 4702; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+seed=42 events=100000 wide_window=False
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l1dcachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l2cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l3cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.sse4_2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx1_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx2_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi1'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512f'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512cd'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512dq'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512bw'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512vl'. Detail: [errno 1] Operation not permitted
+{"user_rows": 13159, "campaign_rows": 13323, "sessions": 20499, "events": 97804, "revenue_cents": 25512190, "elapsed_seconds": 3.3862213979991793}
+setup=0.030593 parse=0.0273506 dedup_events=0.0032488 resolve=0.031249 sessionize_aggregate=0.0355722 write_parquet=0.0159436
+{"user_rows":13159,"campaign_rows":13323,"sessions":20499,"events":97804,"revenue_cents":25512190,"elapsed_seconds":0.144121}
+user_daily: rows 13159 vs 13159; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 13323 vs 13323; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+setup=0.0356149 parse=0.00859024 dedup_events=0.00148772 resolve=0.00866521 sessionize_aggregate=0.0161175 write_parquet=0.0153971
+{"user_rows":13159,"campaign_rows":13323,"sessions":20499,"events":97804,"revenue_cents":25512190,"elapsed_seconds":0.0860335}
+user_daily: rows 13159 vs 13159; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 13323 vs 13323; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+seed=2028 events=30000 wide_window=False
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l1dcachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l2cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l3cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.sse4_2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx1_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx2_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi1'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512f'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512cd'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512dq'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512bw'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512vl'. Detail: [errno 1] Operation not permitted
+{"user_rows": 4146, "campaign_rows": 6529, "sessions": 6513, "events": 29360, "revenue_cents": 5322840, "elapsed_seconds": 1.7327539190009702}
+setup=0.0360114 parse=0.0119663 dedup_events=0.00141896 resolve=0.0141699 sessionize_aggregate=0.0118319 write_parquet=0.00904304
+{"user_rows":4146,"campaign_rows":6529,"sessions":6513,"events":29360,"revenue_cents":5322840,"elapsed_seconds":0.0845693}
+user_daily: rows 4146 vs 4146; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 6529 vs 6529; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+setup=0.0297554 parse=0.00292668 dedup_events=0.000731018 resolve=0.00327804 sessionize_aggregate=0.00838216 write_parquet=0.0064869
+{"user_rows":4146,"campaign_rows":6529,"sessions":6513,"events":29360,"revenue_cents":5322840,"elapsed_seconds":0.051691}
+user_daily: rows 4146 vs 4146; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 6529 vs 6529; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+seed=17 events=20000 wide_window=True
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l1dcachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l2cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.l3cachesize'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.sse4_2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx1_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx2_0'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi1'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.bmi2'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512f'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512cd'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512dq'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512bw'. Detail: [errno 1] Operation not permitted
+/Users/runner/work/crossbow/crossbow/arrow/cpp/src/arrow/util/cpu_info.cc:239: IOError: sysctlbyname failed for 'hw.optional.avx512vl'. Detail: [errno 1] Operation not permitted
+{"user_rows": 2936, "campaign_rows": 4714, "sessions": 4709, "events": 19694, "revenue_cents": 3802545, "elapsed_seconds": 1.5366689980000956}
+setup=0.0377309 parse=0.0078601 dedup_events=0.00155306 resolve=0.00775666 sessionize_aggregate=0.01346 write_parquet=0.00872837
+{"user_rows":2936,"campaign_rows":4714,"sessions":4709,"events":19694,"revenue_cents":3802545,"elapsed_seconds":0.0772491}
+user_daily: rows 2936 vs 2936; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 4714 vs 4714; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+setup=0.0362072 parse=0.00275082 dedup_events=0.000905124 resolve=0.00265108 sessionize_aggregate=0.00405535 write_parquet=0.00567763
+{"user_rows":2936,"campaign_rows":4714,"sessions":4709,"events":19694,"revenue_cents":3802545,"elapsed_seconds":0.0523533}
+user_daily: rows 2936 vs 2936; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 4714 vs 4714; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH
+All generated differential checks passed.

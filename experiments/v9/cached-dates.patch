@@ -1,0 +1,95 @@
+--- a/pipeline/native.cpp
++++ b/pipeline/native.cpp
+@@ -662,50 +662,53 @@
+         return ok ? head * 100000000 + I64(digits8_value(tail)) : BAD;
+     }
+     if (s.size() == 20 && s[19] == 'Z') {
+-        // F1 YYYY-MM-DDTHH:MM:SSZ. Separators are checked, then replaced by
+-        // '0' so all three words can be checked as digits at once.
+-        uint64_t a, b, c;
+-        std::memcpy(&a, s.data(), 8);      // YYYY-MM-
+-        std::memcpy(&b, s.data() + 8, 8);  // DDTHH:MM
+-        std::memcpy(&c, s.data() + 12, 8); // H:MM:SSZ
+-        constexpr uint64_t SEP_A = 0xFF0000FF00000000ULL, // bytes 4, 7
+-                           SEP_B = 0x0000FF0000FF0000ULL, // bytes 2, 5
+-                           SEP_C = 0xFF000000FF00FF00ULL; // bytes 1, 4, 7
++        // A cache hit identifies all ten already-validated YYYY-MM-DD bytes.
++        // Only the time portion needs validation again. A miss still validates
++        // every date character, separator and calendar limit before caching.
++        uint64_t prefix, clock;
++        uint16_t suffix;
++        std::memcpy(&prefix, s.data(), 8);      // YYYY-MM-
++        std::memcpy(&suffix, s.data() + 8, 2); // DD
++        std::memcpy(&clock, s.data() + 12, 8); // H:MM:SSZ
++        constexpr uint64_t SEP_A = 0xFF0000FF00000000ULL,
++                           SEP_C = 0xFF0000FF0000FF00ULL;
+         constexpr uint64_t WANT_A = uint64_t('-') << 32 | uint64_t('-') << 56,
+-                           WANT_B = uint64_t('T') << 16 | uint64_t(':') << 40,
+                            WANT_C = uint64_t(':') << 8 | uint64_t(':') << 32 | uint64_t('Z') << 56;
+         constexpr uint64_t ZEROS = 0x3030303030303030ULL;
+-        if ((a & SEP_A) == WANT_A && (b & SEP_B) == WANT_B && (c & SEP_C) == WANT_C &&
+-            all_digits8((a & ~SEP_A) | (ZEROS & SEP_A)) && all_digits8((b & ~SEP_B) | (ZEROS & SEP_B)) &&
+-            all_digits8((c & ~SEP_C) | (ZEROS & SEP_C))) {
+-            auto d = [&](int i) { return int(uint8_t(s[i]) - '0'); };
++        unsigned hour_tens = unsigned(uint8_t(s[11])) - '0';
++        if (s[10] != 'T' || hour_tens > 2 || (clock & SEP_C) != WANT_C ||
++            !all_digits8((clock & ~SEP_C) | (ZEROS & SEP_C)))
++            return BAD;
++        auto d = [&](int i) { return int(uint8_t(s[i]) - '0'); };
++        int h = int(hour_tens) * 10 + d(12), mi = d(14) * 10 + d(15), sec = d(17) * 10 + d(18);
++        if (h > 23 || mi > 59 || sec > 59)
++            return BAD;
++        struct DateEntry {
++            uint64_t prefix = 0;
++            uint16_t suffix = 0;
++            I64 midnight = BAD;
++        };
++        static thread_local std::array<DateEntry, 32> dates;
++        auto &entry = dates[(unsigned(uint8_t(s[8])) * 10 + uint8_t(s[9])) & 31];
++        I64 midnight;
++        if (entry.prefix == prefix && entry.suffix == suffix && entry.midnight != BAD)
++            midnight = entry.midnight;
++        else {
++            unsigned day_tens = unsigned(uint8_t(s[8])) - '0';
++            unsigned day_ones = unsigned(uint8_t(s[9])) - '0';
++            if ((prefix & SEP_A) != WANT_A || !all_digits8((prefix & ~SEP_A) | (ZEROS & SEP_A)) ||
++                day_tens > 3 || day_ones > 9)
++                return BAD;
+             int y = d(0) * 1000 + d(1) * 100 + d(2) * 10 + d(3), m = d(5) * 10 + d(6),
+-                day = d(8) * 10 + d(9), h = d(11) * 10 + d(12), mi = d(14) * 10 + d(15),
+-                sec = d(17) * 10 + d(18);
+-            struct DateEntry {
+-                uint64_t prefix = 0;
+-                uint16_t suffix = 0;
+-                I64 midnight = BAD;
+-            };
+-            static thread_local std::array<DateEntry, 32> dates;
+-            uint16_t suffix;
+-            std::memcpy(&suffix, s.data() + 8, sizeof(suffix));
+-            auto &entry = dates[unsigned(day) & 31];
+-            I64 midnight;
+-            if (entry.prefix == a && entry.suffix == suffix && entry.midnight != BAD)
+-                midnight = entry.midnight;
+-            else {
+-                static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+-                if (y < 1 || m < 1 || m > 12 || day < 1 ||
+-                    day > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+-                    return BAD;
+-                midnight = days_from_civil(y, unsigned(m), unsigned(day)) * DAY;
+-                entry = {a, suffix, midnight};
+-            }
+-            if (h > 23 || mi > 59 || sec > 59)
++                day = int(day_tens * 10 + day_ones);
++            static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
++            if (y < 1 || m < 1 || m > 12 || day < 1 ||
++                day > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+                 return BAD;
+-            return midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
+-        }
++            midnight = days_from_civil(y, unsigned(m), unsigned(day)) * DAY;
++            entry = {prefix, suffix, midnight};
++        }
++        return midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
+     }
+     return timestamp_general(s);
+ }

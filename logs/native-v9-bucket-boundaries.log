@@ -1,0 +1,5 @@
+PASS lo=2026-10-01T00:00:00Z span=172800000 shuffled_seed=5
+PASS lo=2026-10-01T00:17:00Z span=172800000 shuffled_seed=6
+PASS lo=2026-10-01T23:55:00Z span=600000 shuffled_seed=7
+PASS lo=2026-10-01T00:00:00Z span=6912000000 shuffled_seed=8
+4 boundary datasets, 8 exact comparisons passed

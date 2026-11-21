@@ -1,0 +1,11 @@
+--- a/pipeline/native.cpp
++++ b/pipeline/native.cpp
+@@ -670,7 +670,7 @@
+         std::memcpy(&c, s.data() + 12, 8); // H:MM:SSZ
+         constexpr uint64_t SEP_A = 0xFF0000FF00000000ULL, // bytes 4, 7
+                            SEP_B = 0x0000FF0000FF0000ULL, // bytes 2, 5
+-                           SEP_C = 0xFF000000FF00FF00ULL; // bytes 1, 4, 7
++                           SEP_C = 0xFF0000FF0000FF00ULL; // bytes 1, 4, 7
+         constexpr uint64_t WANT_A = uint64_t('-') << 32 | uint64_t('-') << 56,
+                            WANT_B = uint64_t('T') << 16 | uint64_t(':') << 40,
+                            WANT_C = uint64_t(':') << 8 | uint64_t(':') << 32 | uint64_t('Z') << 56;

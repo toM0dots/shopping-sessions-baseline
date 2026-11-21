@@ -1,0 +1,84 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "data": "dev-tools/scale-20m",
+  "threads": 4,
+  "method": "Exploratory two-round ABCD/DCBA; fresh processes and outputs; no discarded samples; exact comparisons outside timing",
+  "commands": {
+    "baseline": "build/experiments/v9/baseline",
+    "mask": "build/experiments/v9-parser/shopping-sessions-mask",
+    "cached": "build/experiments/v9-parser/shopping-sessions-cached",
+    "buckets": "build/experiments/v9-buckets/shopping-sessions"
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 13.491408337002213,
+      "peak_rss_bytes": 2758774784,
+      "exit_code": 0,
+      "stderr": "setup=0.346117 parse=9.82509 dedup_events=0.682455 resolve=0.687448 sessionize_aggregate=0.86374 write_parquet=0.23585 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":12.6485}"
+    },
+    {
+      "round": 1,
+      "implementation": "mask",
+      "wall_seconds": 4.949203500000294,
+      "peak_rss_bytes": 3067985920,
+      "exit_code": 0,
+      "stderr": "setup=0.315273 parse=2.10794 dedup_events=0.419233 resolve=0.692391 sessionize_aggregate=0.948191 write_parquet=0.263317 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.75745}"
+    },
+    {
+      "round": 1,
+      "implementation": "cached",
+      "wall_seconds": 4.774665184999321,
+      "peak_rss_bytes": 3068833792,
+      "exit_code": 0,
+      "stderr": "setup=0.338763 parse=1.9035 dedup_events=0.391604 resolve=0.796195 sessionize_aggregate=0.879181 write_parquet=0.274523 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.59306}"
+    },
+    {
+      "round": 1,
+      "implementation": "buckets",
+      "wall_seconds": 5.123981411998102,
+      "peak_rss_bytes": 3065122816,
+      "exit_code": 0,
+      "stderr": "setup=0.292703 parse=2.54469 dedup_events=0.38574 resolve=0.747132 sessionize_aggregate=0.742213 write_parquet=0.211385 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.93193}"
+    },
+    {
+      "round": 2,
+      "implementation": "buckets",
+      "wall_seconds": 4.5075553719980235,
+      "peak_rss_bytes": 3066830848,
+      "exit_code": 0,
+      "stderr": "setup=0.311628 parse=1.86598 dedup_events=0.428245 resolve=0.727481 sessionize_aggregate=0.770796 write_parquet=0.220361 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.33278}"
+    },
+    {
+      "round": 2,
+      "implementation": "cached",
+      "wall_seconds": 4.63365981500101,
+      "peak_rss_bytes": 3068153856,
+      "exit_code": 0,
+      "stderr": "setup=0.305689 parse=1.86185 dedup_events=0.431254 resolve=0.648923 sessionize_aggregate=0.860108 write_parquet=0.351406 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.46709}"
+    },
+    {
+      "round": 2,
+      "implementation": "mask",
+      "wall_seconds": 4.926869639999495,
+      "peak_rss_bytes": 3068981248,
+      "exit_code": 0,
+      "stderr": "setup=0.315458 parse=2.17934 dedup_events=0.462303 resolve=0.66515 sessionize_aggregate=0.833854 write_parquet=0.263389 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.72735}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 4.549152323001181,
+      "peak_rss_bytes": 3070177280,
+      "exit_code": 0,
+      "stderr": "setup=0.306125 parse=1.92454 dedup_events=0.36651 resolve=0.638558 sessionize_aggregate=0.834014 write_parquet=0.25937 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.33814}"
+    }
+  ],
+  "summary": {
+    "baseline": 9.020280330001697,
+    "mask": 4.938036569999895,
+    "cached": 4.704162500000166,
+    "buckets": 4.815768391998063
+  }
+}

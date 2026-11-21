@@ -1,0 +1,22 @@
+{
+  "mask-only": {
+    "base_commit": "c0bcee19170616f31e54656a65466e37aca8255d",
+    "patch": "mask-only.patch",
+    "source_sha256": "6847a372e2b460c21b8adeccb7f3b5e5e77aced0a92c28ccf45b98373f1df59a"
+  },
+  "cached-dates": {
+    "base_commit": "c0bcee19170616f31e54656a65466e37aca8255d",
+    "patch": "cached-dates.patch",
+    "source_sha256": "6925c30c775bebc5688fed9aa53edae1f1d82dd2f918be4b54475acfe8bd6eec"
+  },
+  "coarse-buckets": {
+    "base_commit": "c0bcee19170616f31e54656a65466e37aca8255d",
+    "patch": "coarse-buckets.patch",
+    "source_sha256": "f603c87e420b409276bdaf49a6b905e183a65c33ecd77ee7b0ab8d5f3900672f"
+  },
+  "worker-cache": {
+    "base_commit": "059f42f60740ebd1e7ca52a6733e219bb8e47327",
+    "patch": "worker-cache.patch",
+    "source_sha256": "14c9784847afc358060e87f27dd398cfe3fcbe1aa7d8a663d88d797e909b3d71"
+  }
+}

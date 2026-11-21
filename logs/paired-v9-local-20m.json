@@ -1,0 +1,123 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "data": "dev-tools/scale-20m",
+  "threads": 4,
+  "commands": {
+    "baseline": "build/experiments/v9/baseline",
+    "candidate": "build/experiments/v9/candidate"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 6 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 4.286478829999396,
+      "median_seconds": 4.648817752000468,
+      "max_seconds": 5.1260481850004,
+      "peak_rss_bytes": 3068399616
+    },
+    "candidate": {
+      "min_seconds": 4.4845272679995105,
+      "median_seconds": 4.9079107269990345,
+      "max_seconds": 5.347576456999377,
+      "peak_rss_bytes": 3068379136
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 5.1260481850004,
+      "peak_rss_bytes": 3068399616,
+      "exit_code": 0,
+      "stderr": "setup=0.336153 parse=2.18229 dedup_events=0.499902 resolve=0.701235 sessionize_aggregate=0.918932 write_parquet=0.251428 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.89962}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 5.347576456999377,
+      "peak_rss_bytes": 3066277888,
+      "exit_code": 0,
+      "stderr": "setup=0.30995 parse=1.93177 dedup_events=0.463689 resolve=0.766386 sessionize_aggregate=0.823177 write_parquet=0.196932 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.49963}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 5.0430486510013,
+      "peak_rss_bytes": 3065892864,
+      "exit_code": 0,
+      "stderr": "setup=0.339444 parse=2.28336 dedup_events=0.549134 resolve=0.740448 sessionize_aggregate=0.741018 write_parquet=0.1954 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.85635}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 4.579863689999911,
+      "peak_rss_bytes": 3068002304,
+      "exit_code": 0,
+      "stderr": "setup=0.276532 parse=1.71978 dedup_events=0.3482 resolve=0.880344 sessionize_aggregate=0.927821 write_parquet=0.255958 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.4181}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 4.717771814001026,
+      "peak_rss_bytes": 3066101760,
+      "exit_code": 0,
+      "stderr": "setup=0.286861 parse=1.90163 dedup_events=0.510765 resolve=0.696863 sessionize_aggregate=0.871777 write_parquet=0.243876 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.51978}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 4.772772802996769,
+      "peak_rss_bytes": 3065864192,
+      "exit_code": 0,
+      "stderr": "setup=0.347071 parse=2.00111 dedup_events=0.37803 resolve=0.584378 sessionize_aggregate=0.870111 write_parquet=0.25847 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.44853}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 4.732066053999006,
+      "peak_rss_bytes": 3067592704,
+      "exit_code": 0,
+      "stderr": "setup=0.341532 parse=2.06032 dedup_events=0.396401 resolve=0.672006 sessionize_aggregate=0.782379 write_parquet=0.210747 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.47992}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 5.048012190000009,
+      "peak_rss_bytes": 3066617856,
+      "exit_code": 0,
+      "stderr": "setup=0.328387 parse=2.26078 dedup_events=0.461861 resolve=0.650997 sessionize_aggregate=0.907159 write_parquet=0.233193 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.85004}"
+    },
+    {
+      "round": 5,
+      "implementation": "baseline",
+      "wall_seconds": 4.286478829999396,
+      "peak_rss_bytes": 3067244544,
+      "exit_code": 0,
+      "stderr": "setup=0.305844 parse=1.78668 dedup_events=0.377842 resolve=0.67052 sessionize_aggregate=0.761687 write_parquet=0.201996 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.11216}"
+    },
+    {
+      "round": 5,
+      "implementation": "candidate",
+      "wall_seconds": 4.4845272679995105,
+      "peak_rss_bytes": 3065982976,
+      "exit_code": 0,
+      "stderr": "setup=0.286571 parse=1.88693 dedup_events=0.38748 resolve=0.597093 sessionize_aggregate=0.924269 write_parquet=0.226485 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.3167}"
+    },
+    {
+      "round": 6,
+      "implementation": "candidate",
+      "wall_seconds": 5.0658728839989635,
+      "peak_rss_bytes": 3068379136,
+      "exit_code": 0,
+      "stderr": "setup=0.296031 parse=2.24585 dedup_events=0.409804 resolve=0.878019 sessionize_aggregate=0.863412 write_parquet=0.198085 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.8991}"
+    },
+    {
+      "round": 6,
+      "implementation": "baseline",
+      "wall_seconds": 4.524283878999995,
+      "peak_rss_bytes": 3067228160,
+      "exit_code": 0,
+      "stderr": "setup=0.289731 parse=1.92383 dedup_events=0.395489 resolve=0.629324 sessionize_aggregate=0.858697 write_parquet=0.229917 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":4.33532}"
+    }
+  ]
+}

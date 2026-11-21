@@ -1,0 +1,97 @@
+--- a/pipeline/native.cpp
++++ b/pipeline/native.cpp
+@@ -1727,11 +1727,14 @@
+                 gathered.push_back({people_here.intern({e.person, e.person.hash()}), ce});
+             });
+             piece_e.release();
+-            // Radix-sort the piece by time; the stable counting sort by person
+-            // below then leaves every person's events in time order.
++            // Every event inside a 30-minute bucket is connected: its largest
++            // possible gap is strictly below the session threshold. Sort coarse
++            // buckets instead of individual milliseconds; the stable person
++            // grouping then keeps each person's buckets contiguous and ordered.
++            constexpr uint64_t SESSION_GAP = 1800000;
+             event_scratch.reserve(gathered.size());
+-            radix_sort(gathered, event_scratch, uint64_t(hi - 1 - lo),
+-                       [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo); });
++            radix_sort(gathered, event_scratch, uint64_t(hi - 1 - lo) / SESSION_GAP,
++                       [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo) / SESSION_GAP; });
+             size_t np = people_here.size();
+             // Reserve the input-derived size before resizing, so these buffers
+             // need not grow geometrically beyond the largest observed piece.
+@@ -1813,27 +1816,50 @@
+                     active_counts[c] = 0;
+                 active.clear();
+                 size_t left = ci, right = ci;
++                struct Bucket {
++                    size_t end;
++                    I64 first, last;
++                };
++                auto summarize = [&](size_t begin) {
++                    I64 first = events[begin].ts, last = first;
++                    uint64_t bucket = uint64_t(first - lo) / SESSION_GAP;
++                    size_t next = begin + 1;
++                    while (next < end && uint64_t(events[next].ts - lo) / SESSION_GAP == bucket) {
++                        first = std::min(first, events[next].ts);
++                        last = std::max(last, events[next].ts);
++                        ++next;
++                    }
++                    return Bucket{next, first, last};
++                };
++                Bucket current = summarize(at);
+                 while (at < end) {
+-                    int32_t day = floor_day(events[at].ts);
+-                    // Events are in time order, so this day lasts until day_end.
++                    int32_t day = floor_day(current.first);
++                    // A bucket is connected internally. Between buckets, the
++                    // exact last-to-first gap decides whether the session ends.
+                     I64 day_end = (I64(day) + 1) * DAY;
+                     UserRow row{people_here.name(person), day, 0, 0, 0, -1};
+                     do {
+-                        I64 start = events[at].ts, previous = start, rev = 0;
+-                        size_t j = at;
+-                        do {
+-                            auto &e = events[j];
+-                            previous = e.ts;
+-                            rev += e.cents;
+-                            if (e.cents) {
+-                                if (!category_revenue[e.category])
+-                                    touched.push_back(e.category);
+-                                category_revenue[e.category] += e.cents;
++                        I64 start = current.first, rev = 0;
++                        size_t session_begin = at;
++                        for (;;) {
++                            for (; at < current.end; ++at) {
++                                auto &e = events[at];
++                                rev += e.cents;
++                                if (e.cents) {
++                                    if (!category_revenue[e.category])
++                                        touched.push_back(e.category);
++                                    category_revenue[e.category] += e.cents;
++                                }
+                             }
+-                            ++j;
+-                        } while (j < end && events[j].ts - previous <= 1800000);
++                            I64 previous = current.last;
++                            if (at == end)
++                                break;
++                            current = summarize(at);
++                            if (current.first - previous > I64(SESSION_GAP))
++                                break;
++                        }
+                         ++row.sessions;
+-                        row.events += j - at;
++                        row.events += at - session_begin;
+                         row.revenue += rev;
+                         while (right < ce && clicks[right].ts <= start) {
+                             auto c = clicks[right++].campaign;
+@@ -1858,8 +1884,7 @@
+                         stat.revenue += rev;
+                         for (auto c : active)
+                             ++daily.get(c, day).assists;
+-                        at = j;
+-                    } while (at < end && events[at].ts < day_end);
++                    } while (at < end && current.first < day_end);
+                     // Highest revenue, ties to the byte-wise smallest category.
+                     for (auto c : touched)
+                         if (row.category < 0 || category_revenue[c] > category_revenue[row.category] ||

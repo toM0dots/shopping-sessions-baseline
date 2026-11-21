@@ -1,0 +1,24 @@
+{
+  "run_id": 44942909095,
+  "job_id": 136963821164,
+  "url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44942909095",
+  "commit": "059f42f60740ebd1e7ca52a6733e219bb8e47327",
+  "conclusion": "success",
+  "adoption": "Rejected: median Linux container runtime regressed approximately 0.75%; production main stays at c0bcee1.",
+  "checks": [
+    "38/38 isolated container fixtures",
+    "Parser ASan/UBSan SIMD and scalar, including F1 fast-path coverage",
+    "Key ASan/UBSan SIMD and scalar",
+    "Six complete 20M-event/5M-click paired output comparisons"
+  ],
+  "portal_observation": {
+    "date": "2026-11-21",
+    "url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions",
+    "scorer": "shopping-sessions-4",
+    "team_best_seconds": 1.92,
+    "team_best_commit_prefix": "3ef018a0af12",
+    "leaderboard": "Several entries displayed 0.30 seconds; no evidence establishes how these entries work.",
+    "limits": "8 pinned vCPUs (hyperthreads), 24 GB, fresh container start-to-exit; approximately20M practice and60M final events",
+    "submitted": false
+  }
+}

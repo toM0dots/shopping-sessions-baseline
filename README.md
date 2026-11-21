@@ -4,7 +4,60 @@ Native C++ implementation of the [Shopping Sessions challenge](https://www.joinb
 with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
 The default runner executes the compiled native pipeline and writes both Parquet tables.
 
-## Latest update: measured against the latest merged code (v8)
+## Experimental data-pattern fast paths (v9 — not adopted)
+
+This branch records an investigation of the 0.30 s practice scores. It is **not the production
+recommendation**: the latest production implementation remains `c0bcee1` on `main`.
+
+Two exact shortcuts were implemented and checked:
+
+- **UTC timestamp parsing:** the F1 separator mask selected bytes 1, 3, 7 instead of 1, 4, 7,
+  so the specialized path never ran. The candidate fixes that mask and reuses validated
+  dates only when all ten date bytes match. However, the existing general parser already
+  caches dates, so activating another fast path did not guarantee a speedup.
+- **Coarse event buckets:** sort events by `(timestamp - window_start) / 1,800,000` instead
+  of exact milliseconds. Every event within one bucket is connected by gaps below the
+  session threshold. Adjacent occupied buckets are joined only if their exact minimum and
+  maximum timestamps satisfy the original gap rule. This preserves counts, purchases,
+  category totals, session dates and exact click attribution for arbitrary valid inputs.
+
+Six alternating fresh-container pairs, official generator seed 17, 20M events / 5M clicks:
+
+| Linux CI measurement | Production `c0bcee1` | Experimental `059f42f` |
+| --- | ---: | ---: |
+| Median container start to exit | **1.772 s** | 1.785 s |
+| Median entire benchmark invocation | **1.959 s** | 1.964 s |
+
+The candidate regressed **0.75%** on this Intel Xeon 6975P-C runner (four available CPUs,
+container limits four CPUs / 12 GiB; both builds use GCC PGO). Both complete tables matched
+in all six pairs. This is a different host from v8's 1.391 s measurement; compare the two
+columns above, not numbers across hosts. Every sample is retained, including the first
+baseline's 8.955 s outer-wall outlier. The tests passed, but the candidate was not promoted.
+
+Local macOS medians also failed to establish a large-input improvement: 20M changed from
+4.649 s to 4.908 s (+5.6%) over six pairs; public 1M changed from 0.410 s to 0.404 s over ten
+pairs. A separate worker-owned date-cache experiment was neutral/slower in its two-pair
+screen and was left out. Reproducible variant patches and their base commits are in `experiments/v9/`.
+Exploratory and final raw results are in `logs/*v9*.json`;
+[`logs/linux-v9-final-20m.json`](logs/linux-v9-final-20m.json) contains all Linux timings,
+actual limits, image IDs, phase diagnostics and exact comparisons.
+
+Correctness: 38/38 fixtures locally and in Linux; exact public-reference output; five generated
+datasets at one/eight threads; 20 bucket fuzz cases at one/three threads; four targeted boundary
+datasets at one/three threads; parser and key ASan/UBSan checks. Fixtures E21/E22 cover shuffled
+midnight crossings and 30:00.000 versus 30:00.001 gaps. The parser checker now separately confirms
+that valid F1 timestamps use the specialized path and that fallback probes work; it catches the
+original disabled-path bug even though differential values were correct.
+[Successful validation and benchmark](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44942909095).
+
+The live portal displayed several 0.30 s entries and this team's 1.92 s best on an older commit.
+Those numbers do not establish that other teams bypassed the task. The public specification
+requires exact tables, new hidden final data and start-to-exit timing. No portal submission was
+made in this investigation. Inferring links from apparent ID families, skipping event dedup,
+or assuming generated session slots would be incorrect: the generator deliberately includes
+broken/uppercase links, shared devices, invalid earliest duplicates and boundary gaps.
+
+## Latest production update: measured against the latest merged code (v8)
 
 On the official generator's **20M events / 5M clicks, seed 17**, six alternating
 fresh-container pairs against `c330a049` gave:
