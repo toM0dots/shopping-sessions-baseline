@@ -1106,6 +1106,10 @@ static int run() {
                 if (r->event.ts != BAD)
                     event_parts[shard][r->event.person.hash & (SHARDS - 1)].push_back(r->event);
             });
+            // Winners were copied out, so this shard's raw rows can go now,
+            // which lowers the peak while other shards are still deduplicated.
+            for (auto &p : parsed)
+                p[shard].release();
         });
         parsed.clear();
         parsed.shrink_to_fit();
@@ -1145,6 +1149,8 @@ static int run() {
             unique.each([&](auto *c) {
                 click_parts[shard][c->person.hash & (SHARDS - 1)].push_back(*c);
             });
+            for (auto &p : parsed_clicks)
+                p[shard].release();
         });
         parsed_clicks.clear();
         parsed_clicks.shrink_to_fit();
