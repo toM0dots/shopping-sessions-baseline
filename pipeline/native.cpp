@@ -60,6 +60,61 @@ struct Hash {
 };
 template <class T> using Map = std::unordered_map<SV, T, Hash>;
 
+// Read-only copy of a small string map for per-row lookups: one contiguous,
+// cache-resident probe sequence instead of a modulo and a node chain. An
+// occupied flag (not an empty key) marks slots, since an empty ID is valid.
+class FlatIds {
+    struct Entry {
+        SV key;
+        uint32_t tag = 0, value = UINT32_MAX;
+    };
+    std::vector<Entry> entries;
+    size_t mask = 0;
+
+  public:
+    explicit FlatIds(const Map<uint32_t> &map) {
+        size_t cap = 16;
+        while (cap / 2 < map.size())
+            cap *= 2;
+        entries.resize(cap);
+        mask = cap - 1;
+        for (auto &[key, value] : map) {
+            uint64_t hash = Hash{}(key);
+            size_t i = hash & mask;
+            while (entries[i].value != UINT32_MAX)
+                i = (i + 1) & mask;
+            entries[i] = {key, uint32_t(hash >> 32), value};
+        }
+    }
+    const uint32_t *find(SV key) const {
+        uint64_t hash = Hash{}(key);
+        uint32_t tag = uint32_t(hash >> 32);
+        for (size_t i = hash & mask;; i = (i + 1) & mask) {
+            auto &e = entries[i];
+            if (e.value == UINT32_MAX)
+                return nullptr;
+            if (e.tag == tag && e.key == key)
+                return &e.value;
+        }
+    }
+};
+
+// Visits a list in order, calling prefetch on each element a fixed distance
+// before f, so random accesses that f makes have already been requested.
+template <size_t Ahead = 16, class List, class P, class F> void each_ahead(const List &list, P prefetch, F f) {
+    using Row = std::remove_reference_t<decltype(*list.first())>;
+    std::array<const Row *, Ahead> ring;
+    size_t n = 0;
+    list.each([&](const Row &r) {
+        prefetch(r);
+        if (n >= Ahead)
+            f(*ring[n % Ahead]);
+        ring[n++ % Ahead] = &r;
+    });
+    for (size_t k = n > Ahead ? n - Ahead : 0; k < n; ++k)
+        f(*ring[k % Ahead]);
+}
+
 // Input records own the key views. Keep just a fingerprint and winning record
 // pointer in each slot, and compare the full ID whenever fingerprints match.
 // The table has no erases and stays at roughly a two-thirds load factor or less.
@@ -102,17 +157,7 @@ template <class Row> class DedupTable {
     }
     // Inserts rows in order, prefetching each slot a few rows in advance.
     template <class List, class F> void insert_all(const List &list, F f) {
-        constexpr size_t ahead = 16;
-        std::array<const Row *, ahead> ring;
-        size_t n = 0;
-        list.each([&](const Row &r) {
-            prefetch(r.hash);
-            if (n >= ahead)
-                f(*ring[n % ahead]);
-            ring[n++ % ahead] = &r;
-        });
-        for (size_t k = n > ahead ? n - ahead : 0; k < n; ++k)
-            f(*ring[k % ahead]);
+        each_ahead(list, [&](const Row &r) { prefetch(r.hash); }, f);
     }
 };
 
@@ -706,6 +751,11 @@ class PersonTable {
     size_t index(uint64_t hash) const { return (hash / SHARDS) & mask; }
 
   public:
+    // Requests a record's slot and name bytes before intern() or find().
+    void prefetch(const PersonRef &p) const {
+        __builtin_prefetch(&entries[index(p.hash)]);
+        __builtin_prefetch(p.name.data());
+    }
     explicit PersonTable(size_t n) {
         size_t cap = 16;
         while (cap / 2 < n)
@@ -777,6 +827,7 @@ template <class T> class BlockList {
         ++count;
     }
     size_t size() const { return count; }
+    const T *first() const { return blocks.empty() ? nullptr : blocks[0].get(); }
     template <class F> void each(F f) const {
         for (size_t b = 0; b < blocks.size(); ++b) {
             size_t n = b + 1 == blocks.size() ? used
@@ -974,19 +1025,21 @@ static int run() {
         Identity people;
         people.build(chunks(inputs.directory(data / "links")), threads);
         std::vector<SV> categories{"unknown"};
-        Map<uint32_t> cat_ids{{"unknown", 0}}, products;
+        Map<uint32_t> cat_ids{{"unknown", 0}}, product_map;
         rows<2>(inputs.file(data / "products.csv"), true, [&](auto &r) {
             auto [it, added] = cat_ids.emplace(r[1], categories.size());
             if (added)
                 categories.push_back(r[1]);
-            products[r[0]] = it->second;
+            product_map[r[0]] = it->second;
         });
+        FlatIds products(product_map);
         std::vector<std::pair<SV, SV>> campaigns{{"organic", "organic"}};
-        Map<uint32_t> campaign_ids;
+        Map<uint32_t> campaign_map;
         rows<2>(inputs.file(data / "campaigns.csv"), true, [&](auto &r) {
-            campaign_ids[r[0]] = campaigns.size();
+            campaign_map[r[0]] = campaigns.size();
             campaigns.emplace_back(r[0], r[1]);
         });
+        FlatIds campaign_ids(campaign_map);
         auto event_jobs = chunks(inputs.directory(data / "events"));
         auto click_jobs = chunks(inputs.directory(data / "clicks"));
         timing("setup");
@@ -1017,9 +1070,8 @@ static int run() {
                         // lookup for the much larger view/cart population.
                         uint32_t category = 0;
                         if (cents) {
-                            auto product = products.find(r[5]);
-                            if (product != products.end())
-                                category = product->second;
+                            if (auto product = products.find(r[5]))
+                                category = *product;
                         }
                         event = {people.person(r[1], person_hash), ts, cents, category};
                     }
@@ -1063,7 +1115,7 @@ static int run() {
                 if (r[0].empty() || r[1].empty())
                     return;
                 auto c = campaign_ids.find(r[2]);
-                if (c == campaign_ids.end())
+                if (!c)
                     return;
                 I64 ts = timestamp(r[3]);
                 if (ts == BAD || ts < lo - REACH || ts >= hi)
@@ -1071,7 +1123,7 @@ static int run() {
                 // Click duplicates are identical after unquoting, so validation commutes.
                 uint64_t hash = Hash{}(r[0]);
                 parsed_clicks[worker][hash & (SHARDS - 1)].push_back(
-                    {r[0], people.person(r[1], person_hash), hash, ts, c->second});
+                    {r[0], people.person(r[1], person_hash), hash, ts, *c});
             });
         });
         std::array<Partitions<Click>, SHARDS> click_parts;
@@ -1109,7 +1161,8 @@ static int run() {
             {
                 size_t k = 0;
                 for (size_t s = 0; s < SHARDS; ++s)
-                    event_parts[s][shard].each(
+                    each_ahead(
+                        event_parts[s][shard], [&](const Event &e) { people_here.prefetch(e.person); },
                         [&](const Event &e) { event_person[k++] = people_here.intern(e.person); });
             }
             size_t np = people_here.size();
@@ -1135,7 +1188,9 @@ static int run() {
             {
                 size_t k = 0;
                 for (size_t s = 0; s < SHARDS; ++s)
-                    click_parts[s][shard].each([&](const Click &c) {
+                    each_ahead(
+                        click_parts[s][shard], [&](const Click &c) { people_here.prefetch(c.person); },
+                        [&](const Click &c) {
                         auto p = people_here.find(c.person);
                         click_person[k++] = p;
                         if (p != UINT32_MAX)
