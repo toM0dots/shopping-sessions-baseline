@@ -1615,11 +1615,6 @@ int main() {
     if (profile)
         lifecycle("main_enter");
     int result = run();
-    // TIMING PROBE, temporary: run the whole pipeline a second time (same input,
-    // same output files) so the portal score difference against a single run
-    // measures one in-process pipeline run. Revert after the probe submission.
-    if (result == 0)
-        result = run();
     if (profile)
         lifecycle("main_exit");
     return result;
