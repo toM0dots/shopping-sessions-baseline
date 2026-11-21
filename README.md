@@ -4,7 +4,45 @@ Native C++ implementation of the [Shopping Sessions challenge](https://www.joinb
 with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
 The default runner executes the compiled native pipeline and writes both Parquet tables.
 
-## Latest update: parallel identity and leaner partitions
+## Latest update: faster hashing, lookups and memory reuse
+
+Fresh-process paired runs against the previous `main` (`f296c69`), alternating order, `NCPU=4`,
+on the same surrogate inputs and machine as the section below. Both complete tables matched in
+every round:
+
+| Input (surrogate) | Rounds | Previous median | Updated median | Runtime reduction |
+| --- | ---: | ---: | ---: | ---: |
+| 1M events / 250K clicks / 12.5K links | 10 | 0.195 s | **0.185 s** | **5%** |
+| 20M events / 5M clicks / 250K links | 6 | 2.899 s | **2.401 s** | **17%** |
+| 20M events / 5M clicks / 2M links | 6 | 3.421 s | **2.771 s** | **19%** |
+
+Peak RSS fell from 4.41 to 3.98 GiB and from 4.68 to 4.25 GiB. Reports:
+`logs/paired-v5-surrogate-*.json`.
+
+- **Hash function** (largest gain, ~12%): a wyhash-style mixer uses one 128-bit multiply
+  per 16 bytes instead of two serial multiplies per 8 bytes. A micro-benchmark measured
+  14 ns → 5.5 ns per ID, over about 55M hashes per 20M run. Every table still compares
+  full keys, and a test build with a degenerate length-only hash passes all fixtures and
+  40 reference fuzz cases.
+- **Per-shard release** (~5%, −0.5 GiB): each dedup shard frees its raw rows once winners
+  are copied out. This lowers the peak, and later allocations reuse warm memory.
+- **Flat lookups and interning prefetch** (~3%): campaign and product lookups use a
+  contiguous open-addressing copy of their maps. Person interning prefetches table slots
+  and name bytes.
+- **Cold-cache start:** chunk boundaries are now found by the worker that parses each 1 MiB
+  range, not by a serial pre-scan that touched one page per MiB. Cold 20M runs (page cache
+  dropped before each) went from 3.556 s to 3.406 s median; warm runs are unchanged.
+- Short per-person runs use insertion sort.
+
+Tried and rejected after measuring: huge-page or pre-populated buffers, `MADV_WILLNEED`,
+allocator retention tuning, write-combining scatter buffers, a lower identity-table load
+factor, a linked-ID bit filter, and parsing clicks before events.
+
+Validation: 36/36 fixtures (SSE2 and scalar), 150 reference fuzz cases at two thread counts,
+`check_parser_semantics.py` (SIMD and scalar), exact matches on all three surrogate inputs,
+and chunk-boundary resolution tested with 7-byte chunks against the fixtures and 60 fuzz cases.
+
+## Previous update: parallel identity and leaner partitions
 
 Fresh-process paired runs against the previous `main` (`b617b8a`), alternating order, `NCPU=4`.
 Both complete tables matched in every round:

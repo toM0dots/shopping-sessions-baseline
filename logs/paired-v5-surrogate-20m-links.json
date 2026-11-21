@@ -1,0 +1,123 @@
+{
+  "platform": "Linux-6.18.44-fc-v726-x86_64-with-glibc2.39",
+  "data": "surrogate/s20mL",
+  "threads": 4,
+  "commands": {
+    "baseline": "build/main-f296c69",
+    "candidate": "build/shopping-sessions"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 6 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 3.3795420349997585,
+      "median_seconds": 3.4214549055000134,
+      "max_seconds": 3.4523325479999585,
+      "peak_rss_bytes": 5020872704
+    },
+    "candidate": {
+      "min_seconds": 2.7208417330002703,
+      "median_seconds": 2.7713993725003547,
+      "max_seconds": 2.888427695000246,
+      "peak_rss_bytes": 4567678976
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 3.4304666539997015,
+      "peak_rss_bytes": 4998549504,
+      "exit_code": 0,
+      "stderr": "setup=0.416182 parse_events=1.09747 dedup_events=0.418007 clicks=0.561036 sessionize_aggregate=0.473101 write_parquet=0.255269 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":3.23501}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 2.798043682000298,
+      "peak_rss_bytes": 4567678976,
+      "exit_code": 0,
+      "stderr": "setup=0.407602 parse_events=0.871536 dedup_events=0.331061 clicks=0.353079 sessionize_aggregate=0.456444 write_parquet=0.208904 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":2.64318}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 2.7235752219999085,
+      "peak_rss_bytes": 4551475200,
+      "exit_code": 0,
+      "stderr": "setup=0.378369 parse_events=0.879577 dedup_events=0.327286 clicks=0.3348 sessionize_aggregate=0.430891 write_parquet=0.205578 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":2.57137}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 3.3795420349997585,
+      "peak_rss_bytes": 4902834176,
+      "exit_code": 0,
+      "stderr": "setup=0.40316 parse_events=1.12922 dedup_events=0.451672 clicks=0.543186 sessionize_aggregate=0.456612 write_parquet=0.212033 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":3.21016}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 3.398614327999894,
+      "peak_rss_bytes": 5017473024,
+      "exit_code": 0,
+      "stderr": "setup=0.398926 parse_events=1.16977 dedup_events=0.401593 clicks=0.552746 sessionize_aggregate=0.476834 write_parquet=0.21389 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":3.22758}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 2.888427695000246,
+      "peak_rss_bytes": 4559237120,
+      "exit_code": 0,
+      "stderr": "setup=0.416717 parse_events=0.896687 dedup_events=0.370643 clicks=0.356544 sessionize_aggregate=0.4424 write_parquet=0.225302 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":2.7222}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 2.7447550630004116,
+      "peak_rss_bytes": 4547272704,
+      "exit_code": 0,
+      "stderr": "setup=0.376066 parse_events=0.880361 dedup_events=0.316762 clicks=0.35872 sessionize_aggregate=0.447856 write_parquet=0.20618 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":2.60005}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 3.4377847539999493,
+      "peak_rss_bytes": 4857319424,
+      "exit_code": 0,
+      "stderr": "setup=0.393178 parse_events=1.1518 dedup_events=0.423212 clicks=0.573797 sessionize_aggregate=0.492128 write_parquet=0.224945 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":3.27319}"
+    },
+    {
+      "round": 5,
+      "implementation": "baseline",
+      "wall_seconds": 3.4523325479999585,
+      "peak_rss_bytes": 5020872704,
+      "exit_code": 0,
+      "stderr": "setup=0.39539 parse_events=1.15197 dedup_events=0.411254 clicks=0.578823 sessionize_aggregate=0.508688 write_parquet=0.216602 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":3.27743}"
+    },
+    {
+      "round": 5,
+      "implementation": "candidate",
+      "wall_seconds": 2.7208417330002703,
+      "peak_rss_bytes": 4552368128,
+      "exit_code": 0,
+      "stderr": "setup=0.374469 parse_events=0.853028 dedup_events=0.320378 clicks=0.351423 sessionize_aggregate=0.443548 write_parquet=0.212821 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":2.57024}"
+    },
+    {
+      "round": 6,
+      "implementation": "candidate",
+      "wall_seconds": 2.8126175090001198,
+      "peak_rss_bytes": 4538384384,
+      "exit_code": 0,
+      "stderr": "setup=0.40847 parse_events=0.889149 dedup_events=0.328737 clicks=0.364209 sessionize_aggregate=0.444871 write_parquet=0.21195 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":2.66241}"
+    },
+    {
+      "round": 6,
+      "implementation": "baseline",
+      "wall_seconds": 3.4124431570003253,
+      "peak_rss_bytes": 4879781888,
+      "exit_code": 0,
+      "stderr": "setup=0.396572 parse_events=1.12082 dedup_events=0.416279 clicks=0.591498 sessionize_aggregate=0.502619 write_parquet=0.213293 \n{\"user_rows\":2624452,\"campaign_rows\":28014,\"sessions\":3682025,\"events\":19669689,\"revenue_cents\":49402144593,\"elapsed_seconds\":3.25489}"
+    }
+  ]
+}
