@@ -1434,7 +1434,28 @@ static int run() {
         std::vector<Partitions<EventRec>> events_by_user(threads);
         std::vector<std::vector<Purchase>> purchases(threads);
         std::vector<Partitions<DedupRec>> event_ids(threads);
-        parallel(event_jobs.size(), threads, [&](size_t job, size_t worker) {
+        // Click duplicates are identical after unquoting (so validation
+        // commutes), and identical clicks change neither the latest click nor
+        // the set of assisting campaigns. They need no global deduplication.
+        std::vector<Partitions<ClickRec>> clicks_by_user(threads);
+        // Events and clicks share one pool of chunk jobs: one barrier, and the
+        // last jobs of one kind no longer leave threads idle.
+        parallel(event_jobs.size() + click_jobs.size(), threads, [&](size_t job, size_t worker) {
+            if (job >= event_jobs.size()) {
+                fast_rows<4>(click_jobs[job - event_jobs.size()].resolve(), [&](auto &r) {
+                    if (r[0].empty() || r[1].empty())
+                        return;
+                    auto c = campaign_ids.find(r[2]);
+                    if (!c)
+                        return;
+                    I64 ts = timestamp(r[3]);
+                    if (ts == BAD || ts < lo - REACH || ts >= hi)
+                        return;
+                    Key user = Key::of(r[1]);
+                    clicks_by_user[worker][user.hash() & (SHARDS - 1)].push_back({Key::of(r[0]), user, ts, *c});
+                });
+                return;
+            }
             fast_rows<7>(event_jobs[job].resolve(), [&](auto &r) {
                 if (r[0].empty())
                     return;
@@ -1471,7 +1492,7 @@ static int run() {
                 event_ids[worker][id.hash() & (SHARDS - 1)].push_back({id, ingest, stored});
             });
         });
-        timing("parse_events");
+        timing("parse");
         // The earliest copy of each event ID wins. Every other stored copy is
         // tombstoned in place, so winners are never copied. Each shard's records
         // are first split by six more hash bits into 64 buckets of (hash,
@@ -1528,26 +1549,6 @@ static int run() {
         event_ids.clear();
         event_ids.shrink_to_fit();
         timing("dedup_events");
-        // Click duplicates are identical after unquoting (so validation
-        // commutes), and identical clicks change neither the latest click nor
-        // the set of assisting campaigns. They need no global deduplication.
-        std::vector<Partitions<ClickRec>> clicks_by_user(threads);
-        parallel(click_jobs.size(), threads, [&](size_t job, size_t worker) {
-            fast_rows<4>(click_jobs[job].resolve(), [&](auto &r) {
-                if (r[0].empty() || r[1].empty())
-                    return;
-                auto c = campaign_ids.find(r[2]);
-                if (!c)
-                    return;
-                I64 ts = timestamp(r[3]);
-                if (ts == BAD || ts < lo - REACH || ts >= hi)
-                    return;
-                Key user = Key::of(r[1]);
-                clicks_by_user[worker][user.hash() & (SHARDS - 1)].push_back(
-                    {Key::of(r[0]), user, ts, *c});
-            });
-        });
-        timing("clicks");
         // Cache-sized pieces. Each shard's records are resolved against that
         // shard's identity table and split by six more bits of the canonical
         // user's hash into PIECES pieces of a few thousand events; a record whose
