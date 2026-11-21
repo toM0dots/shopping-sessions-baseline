@@ -9,9 +9,22 @@ COPY scripts/build_minimal.cmake /app/scripts/build_minimal.cmake
 RUN cmake -DROOT=/app -DJOBS=${BUILD_JOBS} -DDEPS_ONLY=ON -P /app/scripts/build_minimal.cmake
 COPY CMakeLists.txt /app/CMakeLists.txt
 COPY pipeline/native.cpp /app/pipeline/native.cpp
-RUN cmake -S /app -B /app/build -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH=/app/dev-tools/arrow-minimal \
-    && cmake --build /app/build --parallel ${BUILD_JOBS}
+COPY scripts/training_gen.cpp /app/scripts/training_gen.cpp
+# Profile-guided build: an instrumented binary runs on generated training data
+# (never the scoring data), then the final binary is compiled with its profile.
+# If generating or training fails for any reason, the final binary is built
+# without a profile instead, so this step cannot fail a submission.
+RUN set -e; \
+    build() { cmake -S /app -B /app/build -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=/app/dev-tools/arrow-minimal -DPGO=$1 \
+      && cmake --build /app/build --parallel ${BUILD_JOBS}; }; \
+    build generate; \
+    if g++ -O2 -std=c++17 /app/scripts/training_gen.cpp -o /tmp/training_gen \
+        && /tmp/training_gen /tmp/train 1000000 \
+        && DATA_DIR=/tmp/train OUTPUT_DIR=/tmp/train-out NCPU=${BUILD_JOBS} /app/build/shopping-sessions; \
+    then build use; \
+    else echo "PGO training failed; building without a profile" >&2; build OFF; fi; \
+    rm -rf /tmp/train /tmp/train-out /tmp/training_gen
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \
