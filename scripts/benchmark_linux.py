@@ -110,9 +110,13 @@ def measure_container(image, data, output, scratch, threads, memory, docker_plat
             # Also clean up a still-running container if startup/inspection fails.
             run(["docker", "rm", "--force", container], capture_output=True, text=True)
         if needs_permission_cleanup(output, scratch):
+            # The mount roots belong to the host runner, so UID 1000 cannot
+            # chmod those directories even when they are writable. Only change
+            # entries owned by the container user; retain strict error handling.
             run(["docker", "run", "--rm", "--platform", docker_platform, "--network", "none",
                  "--user", "1000:1000", "-v", f"{output}:/output:z", "-v", f"{scratch}:/scratch:z",
-                 "--entrypoint", "chmod", image["id"], "-R", "a+rwX", "/output", "/scratch"],
+                 "--entrypoint", "find", image["id"], "/output", "/scratch", "-uid", "1000",
+                 "-exec", "chmod", "a+rwX", "{}", "+"],
                 capture_output=True, text=True)
         shutil.rmtree(scratch)
     wall_seconds = time.perf_counter() - beginning
