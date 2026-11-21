@@ -21,7 +21,8 @@ RUN set -e; \
     build generate; \
     if g++ -O2 -std=c++17 /app/scripts/training_gen.cpp -o /tmp/training_gen \
         && /tmp/training_gen /tmp/train 1000000 \
-        && DATA_DIR=/tmp/train OUTPUT_DIR=/tmp/train-out NCPU=${BUILD_JOBS} /app/build/shopping-sessions \
+        && SHOPPING_FULL_EXIT=1 DATA_DIR=/tmp/train OUTPUT_DIR=/tmp/train-out NCPU=${BUILD_JOBS} \
+           /app/build/shopping-sessions \
         && find /app/build -name '*.gcda' | grep -q .; \
     then build use || { echo "PGO build failed; building without a profile" >&2; build OFF; }; \
     else echo "PGO training failed; building without a profile" >&2; build OFF; fi; \

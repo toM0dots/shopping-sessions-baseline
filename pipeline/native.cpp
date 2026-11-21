@@ -800,14 +800,18 @@ static I64 floor_day(I64 t) {
     return d - (t % DAY < 0);
 }
 
-template <class F> void parallel(size_t jobs, size_t threads, F f) {
+// Runs f(job, worker) for every job on up to `threads` workers. Worker 0 first
+// runs first(), an independent task, then takes jobs like the others.
+template <class G, class F> void parallel_after(size_t jobs, size_t threads, G first, F f) {
     std::atomic<size_t> next{0};
     std::exception_ptr failure;
     std::mutex lock;
     std::vector<std::thread> pool;
-    for (size_t t = 0; t < std::min(jobs, threads); ++t)
+    for (size_t t = 0; t < std::max<size_t>(1, std::min(jobs, threads)); ++t)
         pool.emplace_back([&, t] {
             try {
+                if (t == 0)
+                    first();
                 for (size_t i; (i = next.fetch_add(1)) < jobs;)
                     f(i, t);
             } catch (...) {
@@ -821,6 +825,10 @@ template <class F> void parallel(size_t jobs, size_t threads, F f) {
         t.join();
     if (failure)
         std::rethrow_exception(failure);
+}
+template <class F> void parallel(size_t jobs, size_t threads, F f) {
+    if (jobs)
+        parallel_after(jobs, threads, [] {}, f);
 }
 // A nominal byte range of one input file. Boundaries are resolved by the
 // worker that parses it, so no input is touched serially beforehand (on cold
@@ -877,10 +885,14 @@ class Identity {
     };
     std::array<Shard, SHARDS> shards;
     std::vector<Key> names;
+    // Between intern() and link(): each link's two sides as (shard, local ID).
+    std::vector<uint64_t> sides;
     static size_t index(uint64_t hash, size_t mask) { return (hash / SHARDS) & mask; }
 
   public:
-    void build(const std::vector<Chunk> &jobs, size_t threads) {
+    // Parallel part: parse links and intern every ID. link() must follow
+    // before any lookup.
+    void intern(const std::vector<Chunk> &jobs, size_t threads) {
         // Pass 1: parse each chunk and bucket its ID references by shard.
         std::vector<std::array<std::vector<Ref>, SHARDS>> refs(jobs.size());
         std::vector<uint32_t> pairs(jobs.size() + 1);
@@ -901,7 +913,7 @@ class Identity {
         for (size_t j = 0; j < jobs.size(); ++j)
             pairs[j + 1] += pairs[j];
         // Pass 2: intern each shard independently. Sides receive (shard, local ID).
-        std::vector<uint64_t> sides(size_t(pairs.back()) * 2);
+        sides.assign(size_t(pairs.back()) * 2, 0);
         std::array<std::vector<Key>, SHARDS> local_names;
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
             size_t count = 0;
@@ -944,7 +956,15 @@ class Identity {
                 if (!e.key.empty())
                     e.canon.v += base;
         });
+    }
+    // Serial part, single-threaded so it can overlap other work: union the
+    // links and store each ID's canonical ID in its table entry.
+    void link() {
+        uint32_t total = uint32_t(names.size());
         auto global = [&](uint64_t side) { return shards[side >> 32].base + uint32_t(side); };
+        // Union-find where every union makes the bytewise-smaller name the
+        // root, so each root is its component's canonical ID and no separate
+        // minimum pass is needed. Path halving keeps the trees shallow.
         std::vector<uint32_t> parent(total);
         for (uint32_t i = 0; i < total; ++i)
             parent[i] = i;
@@ -955,42 +975,24 @@ class Identity {
             }
             return x;
         };
-        std::vector<uint32_t> size(total, 1);
+        constexpr size_t ahead = 16; // pairs; their parent slots are fetched early
         for (size_t k = 0; k < sides.size(); k += 2) {
+            if (k + 2 * ahead + 1 < sides.size()) {
+                __builtin_prefetch(&parent[global(sides[k + 2 * ahead])]);
+                __builtin_prefetch(&parent[global(sides[k + 2 * ahead + 1])]);
+            }
             auto x = find(global(sides[k])), y = find(global(sides[k + 1]));
             if (x == y)
                 continue;
-            if (size[x] < size[y])
+            if (names[y] < names[x])
                 std::swap(x, y);
             parent[y] = x;
-            size[x] += size[y];
         }
-        std::vector<uint32_t>().swap(size);
         std::vector<uint64_t>().swap(sides);
-        // Flatten every path, then name each component by its bytewise-smallest
-        // ID. The minimum is order-independent, so ranges run concurrently with
-        // a compare-and-swap per improvement.
-        for (uint32_t i = 0; i < total; ++i)
-            parent[i] = find(i);
-        std::unique_ptr<std::atomic<uint32_t>[]> best(new std::atomic<uint32_t>[total]);
-        for (uint32_t i = 0; i < total; ++i)
-            best[i].store(i, std::memory_order_relaxed);
-        constexpr size_t range = 1 << 16;
-        parallel((total + range - 1) / range, threads, [&](size_t job, size_t) {
-            uint32_t first = job * range, last = std::min<size_t>(total, first + range);
-            for (uint32_t i = first; i < last; ++i) {
-                auto &slot = best[parent[i]];
-                uint32_t current = slot.load(std::memory_order_relaxed);
-                while (names[i] < names[current] &&
-                       !slot.compare_exchange_weak(current, i, std::memory_order_relaxed))
-                    ;
-            }
-        });
-        parallel(SHARDS, threads, [&](size_t shard, size_t) {
-            for (auto &e : shards[shard].table)
+        for (auto &shard : shards)
+            for (auto &e : shard.table)
                 if (!e.key.empty())
-                    e.canon = names[best[parent[uint32_t(e.canon.v)]].load(std::memory_order_relaxed)];
-        });
+                    e.canon = names[find(uint32_t(e.canon.v))];
         std::vector<Key>().swap(names);
     }
     void prefetch(uint64_t hash) const {
@@ -1429,7 +1431,7 @@ static int run() {
         if (lo == BAD || hi == BAD || lo >= hi)
             throw std::runtime_error("invalid manifest window");
         Identity people;
-        people.build(chunks(inputs.directory(data / "links")), threads);
+        people.intern(chunks(inputs.directory(data / "links")), threads);
         std::vector<SV> categories{"unknown"};
         Map<uint32_t> cat_ids{{"unknown", 0}}, product_map;
         rows<2>(inputs.file(data / "products.csv"), true, [&](auto &r) {
@@ -1461,7 +1463,10 @@ static int run() {
         std::vector<Partitions<ClickRec>> clicks_by_user(threads);
         // Events and clicks share one pool of chunk jobs: one barrier, and the
         // last jobs of one kind no longer leave threads idle.
-        parallel(event_jobs.size() + click_jobs.size(), threads, [&](size_t job, size_t worker) {
+        // Identities are first needed after parsing: one worker links them
+        // while the others start on events and clicks, then joins them.
+        parallel_after(event_jobs.size() + click_jobs.size(), threads, [&] { people.link(); },
+                       [&](size_t job, size_t worker) {
             if (job >= event_jobs.size()) {
                 fast_rows<4>(click_jobs[job - event_jobs.size()].resolve(), [&](auto &r) {
                     if (r[0].empty() || r[1].empty())
@@ -1845,6 +1850,15 @@ static int run() {
                   << ",\"revenue_cents\":" << revenue << ",\"elapsed_seconds\":"
                   << std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count()
                   << "}\n";
+        // Every output file is closed. Freeing gigabytes of buffers one by one
+        // costs tens of milliseconds the kernel saves by dropping the address
+        // space at exit. SHOPPING_FULL_EXIT keeps the normal path, which runs
+        // the exit handlers that write PGO profiles during the build.
+        if (!std::getenv("SHOPPING_FULL_EXIT")) {
+            std::cerr.flush();
+            std::fflush(nullptr);
+            _exit(0);
+        }
         return 0;
     } catch (const std::exception &e) {
         std::cerr << "pipeline: " << e.what() << '\n';
