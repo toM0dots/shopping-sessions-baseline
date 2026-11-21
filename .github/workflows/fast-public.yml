@@ -1,0 +1,68 @@
+name: Fast engine public golden answer
+on:
+  push:
+    paths:
+      - '.github/workflows/fast-public.yml'
+      - 'Dockerfile'
+      - 'fast/**'
+      - 'pipeline/dispatch.cpp'
+      - 'scripts/check_public_fastpath.py'
+  pull_request:
+    paths:
+      - '.github/workflows/fast-public.yml'
+      - 'Dockerfile'
+      - 'fast/**'
+      - 'pipeline/dispatch.cpp'
+      - 'scripts/check_public_fastpath.py'
+permissions:
+  contents: read
+jobs:
+  public-golden:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the exact revision
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin "https://github.com/${REPOSITORY}.git"
+          git fetch --depth 1 origin "$REVISION"
+          git checkout --detach FETCH_HEAD
+      - name: Install checker dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Build the identical fast engine and portable dispatcher
+        run: |
+          docker build --target fast-builder -t shopping-sessions:fast-ci .
+          mkdir -p build/public-ci/bin
+          cid=$(docker create shopping-sessions:fast-ci)
+          docker cp "$cid:/fast-bin/." build/public-ci/bin
+          docker rm "$cid"
+          g++ -O2 -std=c++17 pipeline/dispatch.cpp -o build/public-ci/bin/shopping-sessions-dispatch
+      - name: Build checksum-pinned official generator
+        run: |
+          .venv/bin/python - <<'PY'
+          import hashlib, pathlib, subprocess, sys, urllib.request, zipfile
+          sys.path.insert(0, 'scripts')
+          from benchmark_linux import GENERATOR_SHA, GENERATOR_URL
+          work = pathlib.Path('build/public-ci').resolve()
+          archive = work / 'generator.zip'
+          urllib.request.urlretrieve(GENERATOR_URL, archive)
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != GENERATOR_SHA:
+              raise SystemExit('Official generator checksum changed')
+          with zipfile.ZipFile(archive) as zipped:
+              zipped.extractall(work / 'generator-source')
+          manifests = list((work / 'generator-source').rglob('Cargo.toml'))
+          if len(manifests) != 1:
+              raise SystemExit('Expected exactly one generator Cargo.toml')
+          subprocess.run(['cargo', 'build', '--release', '--locked', '--manifest-path', str(manifests[0]),
+                          '--target-dir', str(work / 'generator-target')], check=True)
+          PY
+      - name: Compare public 1M outputs with official golden CSVs
+        run: |
+          .venv/bin/python scripts/check_public_fastpath.py build/public-ci/generator-target/release/generate \
+            --candidate build/public-ci/bin/shopping-sessions-dispatch \
+            --report logs/public-generator-fastpath.json
