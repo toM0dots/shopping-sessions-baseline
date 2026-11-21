@@ -9,10 +9,15 @@ FIXTURES ?= $(if $(wildcard fixtures),fixtures,../../fixtures)
 export IMAGE CPUS MEM PLATFORM
 
 PYTHON ?= python3
-.PHONY: build fixtures dev run-dev check-dev native native-fixtures benchmark
+BUILD_JOBS ?= 4
+.PHONY: build fixtures dev run-dev check-dev native native-wheel native-fixtures benchmark
 
-## Compile locally against PyArrow's bundled C++ headers and libraries
+## Build the minimal Arrow/Parquet libraries and native executable
 native:
+	cmake -DJOBS=$(BUILD_JOBS) -P scripts/build_minimal.cmake
+
+## Faster build-time alternative using the larger PyArrow shared libraries
+native-wheel:
 	$(PYTHON) scripts/build_native.py
 
 native-fixtures: native

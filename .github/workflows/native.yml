@@ -1,0 +1,54 @@
+name: Native Linux container
+on:
+  push:
+    paths:
+      - '.github/workflows/native.yml'
+      - '.dockerignore'
+      - 'Dockerfile'
+      - 'CMakeLists.txt'
+      - 'Makefile'
+      - 'pipeline/**'
+      - 'scripts/**'
+      - 'fixtures/**'
+      - 'requirements*.txt'
+      - 'run.sh'
+  pull_request:
+    paths:
+      - '.github/workflows/native.yml'
+      - '.dockerignore'
+      - 'Dockerfile'
+      - 'CMakeLists.txt'
+      - 'Makefile'
+      - 'pipeline/**'
+      - 'scripts/**'
+      - 'fixtures/**'
+      - 'requirements*.txt'
+      - 'run.sh'
+permissions:
+  contents: read
+jobs:
+  container-fixtures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact revision
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin "https://github.com/${REPOSITORY}.git"
+          git fetch --depth 1 origin "$REVISION"
+          git checkout --detach FETCH_HEAD
+      - name: Install official checker dependency
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Build Linux image
+        run: docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
+      - name: Run all fixtures with scorer isolation flags
+        env:
+          IMAGE: shopping-sessions:ci
+          CPUS: "2"
+          MEM: 6g
+        run: .venv/bin/python scripts/run_fixtures.py fixtures -- scripts/docker_run.sh

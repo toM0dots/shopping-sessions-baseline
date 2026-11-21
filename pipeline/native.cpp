@@ -20,6 +20,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <thread>
+#include <time.h>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
@@ -54,33 +55,36 @@ struct Hash {
 };
 template <class T> using Map = std::unordered_map<SV, T, Hash>;
 
-// No erases or owned key allocations. Empty keys are excluded by CSV semantics.
-template <class T> class FlatMap {
+// Input records own the key views. Keep just a fingerprint and winning record
+// pointer in each slot, and compare the full ID whenever fingerprints match.
+// The table has no erases and stays at roughly a two-thirds load factor or less.
+template <class Row> class DedupTable {
     struct Entry {
-        SV key;
-        T value{};
+        uint64_t hash = 0;
+        const Row *value = nullptr;
     };
     std::vector<Entry> entries;
 
   public:
-    explicit FlatMap(size_t n) {
+    explicit DedupTable(size_t n) {
         size_t cap = 8;
-        while (cap < n * 2)
+        while (cap - cap / 3 < n)
             cap *= 2;
         entries.resize(cap);
     }
-    T &slot(SV key) {
+    const Row *&slot(const Row &row, uint64_t hash) {
         // Sharding already consumed the low six bits. Reusing them here would
         // cluster every key in the shard into 1/64 of the initial buckets.
-        size_t i = (Hash{}(key) / SHARDS) & (entries.size() - 1);
-        while (!entries[i].key.empty() && entries[i].key != key)
+        size_t i = (hash / SHARDS) & (entries.size() - 1);
+        while (entries[i].value &&
+               (entries[i].hash != hash || entries[i].value->id != row.id))
             i = (i + 1) & (entries.size() - 1);
-        entries[i].key = key;
+        entries[i].hash = hash;
         return entries[i].value;
     }
     template <class F> void each(F f) {
         for (auto &e : entries)
-            if (!e.key.empty())
+            if (e.value)
                 f(e.value);
     }
 };
@@ -251,10 +255,47 @@ static I64 floor_day(I64 t) {
     return d - (t % DAY < 0);
 }
 
+// Once linking is finished, all identity queries are read-only. A contiguous
+// lookup avoids unordered_map node chasing on every event and click.
+class PersonLookup {
+    struct Entry {
+        SV key;
+        uint32_t person = 0, tag = 0;
+    };
+    std::vector<Entry> entries;
+
+  public:
+    explicit PersonLookup(size_t count) {
+        size_t capacity = 8;
+        while (capacity * 7 / 10 < count)
+            capacity *= 2;
+        entries.resize(capacity);
+    }
+    void insert(SV key, uint32_t person) {
+        uint64_t hash = Hash{}(key);
+        size_t at = hash & (entries.size() - 1);
+        while (!entries[at].key.empty())
+            at = (at + 1) & (entries.size() - 1);
+        entries[at] = {key, person, uint32_t(hash >> 32)};
+    }
+    const uint32_t *find(SV key) const {
+        uint64_t hash = Hash{}(key);
+        size_t at = hash & (entries.size() - 1);
+        while (!entries[at].key.empty()) {
+            auto &entry = entries[at];
+            if (entry.tag == uint32_t(hash >> 32) && entry.key == key)
+                return &entry.person;
+            at = (at + 1) & (entries.size() - 1);
+        }
+        return nullptr;
+    }
+};
+
 struct People {
     Map<uint32_t> ids;
     std::vector<uint32_t> parent, size;
     std::vector<SV> names;
+    std::unique_ptr<PersonLookup> lookup;
     uint32_t id(SV s) {
         auto [it, new_id] = ids.emplace(s, parent.size());
         if (new_id) {
@@ -282,12 +323,18 @@ struct People {
         names[x] = std::min(names[x], names[y]);
     }
     void freeze() {
+        lookup = std::make_unique<PersonLookup>(ids.size());
         for (auto &[key, i] : ids)
-            i = find(i);
+            lookup->insert(key, find(i));
+        // These mutable structures are no longer needed. Ordinary destruction
+        // is retained; its cost is included in end-to-end process timing.
+        Map<uint32_t>().swap(ids);
+        std::vector<uint32_t>().swap(parent);
+        std::vector<uint32_t>().swap(size);
     }
     SV person(SV s) const {
-        auto it = ids.find(s);
-        return it == ids.end() ? s : names[it->second];
+        auto person = lookup->find(s);
+        return person ? names[*person] : s;
     }
 };
 
@@ -339,13 +386,28 @@ struct Event {
     uint32_t category;
 };
 struct RawEvent {
-    SV id, ingest;
+    SV id;
+    I64 ingest;
+    uint64_t hash;
     Event event;
 };
 struct Click {
     SV id, person;
     I64 ts;
     uint32_t campaign;
+};
+// Intern person names once per partition before sorting. Integer comparisons
+// avoid repeatedly chasing input-backed strings, while output names stay exact.
+struct CompactEvent {
+    I64 ts;
+    uint32_t person;
+    int cents;
+    uint32_t category;
+};
+struct CompactClick {
+    SV id;
+    I64 ts;
+    uint32_t person, campaign;
 };
 template <class T> using Partitions = std::array<std::vector<T>, SHARDS>;
 struct UserRow {
@@ -366,6 +428,44 @@ struct Stats {
 };
 using CampaignDaily = std::unordered_map<uint64_t, Stats>;
 static uint64_t campaign_key(uint32_t c, int32_t d) { return (uint64_t(uint32_t(d)) << 32) | c; }
+
+// Campaigns and dates have a small, input-derived domain in the challenge.
+// Keep one accumulator per worker, reused across its partitions. Fall back to
+// sparse storage when a wider window/domain would exceed the shared budget.
+class CampaignAccumulator {
+    size_t campaign_count;
+    int32_t first_day;
+    std::vector<Stats> dense;
+    CampaignDaily sparse;
+
+  public:
+    CampaignAccumulator(size_t campaigns, int32_t first, size_t days, size_t workers)
+        : campaign_count(campaigns), first_day(first) {
+        constexpr size_t budget = 64 * 1024 * 1024;
+        size_t max_cells = budget / workers / sizeof(Stats);
+        if (campaigns && days <= max_cells / campaigns)
+            dense.resize(campaigns * days);
+    }
+    Stats &get(uint32_t campaign, int32_t day) {
+        if (!dense.empty())
+            return dense[size_t(int64_t(day) - first_day) * campaign_count + campaign];
+        return sparse[campaign_key(campaign, day)];
+    }
+    void merge_into(CampaignDaily &result) const {
+        if (dense.empty()) {
+            for (auto &[key, value] : sparse)
+                result[key] += value;
+        } else {
+            for (size_t i = 0; i < dense.size(); ++i) {
+                auto &value = dense[i];
+                if (value.sessions || value.assists)
+                    result[campaign_key(
+                        i % campaign_count,
+                        int32_t(int64_t(first_day) + int64_t(i / campaign_count)))] += value;
+            }
+        }
+    }
+};
 
 static void check(arrow::Status s) {
     if (!s.ok())
@@ -455,7 +555,7 @@ static std::string env(const char *key, const char *fallback) {
     return p ? p : fallback;
 }
 
-int main() {
+static int run() {
     try {
         auto begin = std::chrono::steady_clock::now(), last = begin;
         auto timing = [&](const char *name) {
@@ -464,7 +564,7 @@ int main() {
             last = now;
         };
         fs::path data = env("DATA_DIR", "/data"), out = env("OUTPUT_DIR", "/output");
-    size_t threads = std::stoul(env("NCPU", "8"));
+        size_t threads = std::stoul(env("NCPU", "8"));
         if (!threads || threads > 256)
             throw std::runtime_error("NCPU must be 1..256");
         Inputs inputs;
@@ -512,11 +612,14 @@ int main() {
                 if (r[0].empty())
                     return;
                 Event event{{}, BAD, 0, 0};
+                // ingest_ts is guaranteed valid F1; integer ordering is the
+                // same as its original lexical ordering. Reuse this parse for
+                // lateness and deduplication, even for invalid winning events.
+                I64 ingest = timestamp(r[3]);
                 bool valid = !r[1].empty() && !r[5].empty() &&
                              (r[4] == "view" || r[4] == "cart" || r[4] == "purchase");
                 I64 ts = valid ? timestamp(r[2]) : BAD;
                 if (ts != BAD && ts >= lo && ts < hi) {
-                    I64 ingest = timestamp(r[3]);
                     int cents = r[4] == "purchase" ? price(r[6]) : 0;
                     if (ingest != BAD && ingest - ts <= DAY && (r[4] != "purchase" || cents)) {
                         // Categories only contribute for purchases. Avoid a dictionary
@@ -531,7 +634,8 @@ int main() {
                     }
                 }
                 // Invalid winners must remain present until global ID deduplication.
-                parsed[worker][Hash{}(r[0]) & (SHARDS - 1)].push_back({r[0], r[3], event});
+                uint64_t hash = Hash{}(r[0]);
+                parsed[worker][hash & (SHARDS - 1)].push_back({r[0], ingest, hash, event});
             });
         });
         timing("parse_events");
@@ -540,10 +644,10 @@ int main() {
             size_t count = 0;
             for (auto &p : parsed)
                 count += p[shard].size();
-            FlatMap<const RawEvent *> unique(count);
+            DedupTable<RawEvent> unique(count);
             for (auto &p : parsed)
                 for (auto &r : p[shard]) {
-                    auto &old = unique.slot(r.id);
+                    auto &old = unique.slot(r, r.hash);
                     if (!old || r.ingest < old->ingest)
                         old = &r;
                 }
@@ -575,10 +679,10 @@ int main() {
             size_t count = 0;
             for (auto &p : parsed_clicks)
                 count += p[shard].size();
-            FlatMap<const Click *> unique(count);
+            DedupTable<Click> unique(count);
             for (auto &p : parsed_clicks)
                 for (auto &r : p[shard])
-                    unique.slot(r.id) = &r;
+                    unique.slot(r, Hash{}(r.id)) = &r;
             unique.each([&](auto *c) {
                 click_parts[shard][Hash{}(c->person) & (SHARDS - 1)].push_back(*c);
             });
@@ -586,10 +690,14 @@ int main() {
         parsed_clicks.clear();
         timing("clicks");
         std::array<std::vector<UserRow>, SHARDS> user_rows;
-        std::array<CampaignDaily, SHARDS> campaign_rows;
-        parallel(SHARDS, threads, [&](size_t shard, size_t) {
-            std::vector<Event> events;
-            std::vector<Click> clicks;
+        std::vector<CampaignAccumulator> campaign_rows;
+        size_t aggregate_workers = std::min(SHARDS, threads);
+        for (size_t i = 0; i < aggregate_workers; ++i)
+            campaign_rows.emplace_back(campaigns.size(), floor_day(lo),
+                                       floor_day(hi - 1) - floor_day(lo) + 1, aggregate_workers);
+        parallel(SHARDS, threads, [&](size_t shard, size_t worker) {
+            std::vector<CompactEvent> events;
+            std::vector<CompactClick> clicks;
             size_t ne = 0, nc = 0;
             for (size_t s = 0; s < SHARDS; ++s) {
                 ne += event_parts[s][shard].size();
@@ -597,12 +705,26 @@ int main() {
             }
             events.reserve(ne);
             clicks.reserve(nc);
+            Map<uint32_t> person_ids;
+            person_ids.reserve(ne / 16 + 1);
+            std::vector<SV> person_names;
             for (size_t s = 0; s < SHARDS; ++s) {
                 auto &ev = event_parts[s][shard];
-                events.insert(events.end(), ev.begin(), ev.end());
+                for (auto &e : ev) {
+                    auto [it, added] = person_ids.emplace(e.person, person_names.size());
+                    if (added)
+                        person_names.push_back(e.person);
+                    events.push_back({e.ts, it->second, e.cents, e.category});
+                }
                 std::vector<Event>().swap(ev);
+            }
+            for (size_t s = 0; s < SHARDS; ++s) {
                 auto &cl = click_parts[s][shard];
-                clicks.insert(clicks.end(), cl.begin(), cl.end());
+                for (auto &c : cl) {
+                    auto it = person_ids.find(c.person);
+                    if (it != person_ids.end())
+                        clicks.push_back({c.id, c.ts, it->second, c.campaign});
+                }
                 std::vector<Click>().swap(cl);
             }
             std::sort(events.begin(), events.end(), [](auto &a, auto &b) {
@@ -613,13 +735,13 @@ int main() {
                                             : (a.ts != b.ts ? a.ts < b.ts : a.id > b.id);
             });
             auto &rows = user_rows[shard];
-            auto &daily = campaign_rows[shard];
+            auto &daily = campaign_rows[worker];
             std::vector<I64> category_revenue(categories.size());
             std::vector<uint32_t> active_counts(campaigns.size()), positions(campaigns.size()),
                 active;
             size_t at = 0, ci = 0;
             while (at < events.size()) {
-                SV person = events[at].person;
+                uint32_t person = events[at].person;
                 size_t end = at + 1;
                 while (end < events.size() && events[end].person == person)
                     ++end;
@@ -634,7 +756,7 @@ int main() {
                 size_t left = ci, right = ci;
                 while (at < end) {
                     int32_t day = floor_day(events[at].ts);
-                    UserRow row{person, day, 0, 0, 0, -1};
+                    UserRow row{person_names[person], day, 0, 0, 0, -1};
                     std::fill(category_revenue.begin(), category_revenue.end(), 0);
                     do {
                         I64 start = events[at].ts, previous = start, rev = 0;
@@ -667,12 +789,12 @@ int main() {
                             }
                         }
                         uint32_t credit = right > left ? clicks[right - 1].campaign : 0;
-                        auto &stat = daily[campaign_key(credit, day)];
+                        auto &stat = daily.get(credit, day);
                         ++stat.sessions;
                         stat.purchasing += rev > 0;
                         stat.revenue += rev;
                         for (auto c : active)
-                            ++daily[campaign_key(c, day)].assists;
+                            ++daily.get(c, day).assists;
                         at = j;
                     } while (at < end && floor_day(events[at].ts) == day);
                     for (size_t c = 0; c < categories.size(); ++c)
@@ -690,8 +812,7 @@ int main() {
         timing("sessionize_aggregate");
         CampaignDaily daily;
         for (auto &part : campaign_rows)
-            for (auto &[key, r] : part)
-                daily[key] += r;
+            part.merge_into(daily);
         parallel(2, std::min<size_t>(threads, 2), [&](size_t i, size_t) {
             if (i == 0)
                 write_users(out, user_rows, categories);
@@ -717,4 +838,24 @@ int main() {
         std::cerr << "pipeline: " << e.what() << '\n';
         return 1;
     }
+}
+
+// Optional lifecycle markers use the same OS monotonic clock as the parent
+// benchmark, separating launch/loader time from local cleanup and process exit.
+static void lifecycle(const char *phase) {
+    struct timespec ts {};
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        throw std::runtime_error("cannot read monotonic clock");
+    std::cerr << "lifecycle_" << phase << "_ns=" << uint64_t(ts.tv_sec) * 1000000000ULL + ts.tv_nsec
+              << '\n';
+}
+
+int main() {
+    bool profile = std::getenv("PROFILE_LIFECYCLE") != nullptr;
+    if (profile)
+        lifecycle("main_enter");
+    int result = run();
+    if (profile)
+        lifecycle("main_exit");
+    return result;
 }

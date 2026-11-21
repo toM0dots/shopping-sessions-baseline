@@ -1,0 +1,44 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "data": "dev-tools/scale-20m",
+  "threads": 8,
+  "commands": {
+    "baseline": "build/shopping-sessions-v1",
+    "candidate": "build/shopping-sessions"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 1 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 27.014060241985135,
+      "median_seconds": 27.014060241985135,
+      "max_seconds": 27.014060241985135,
+      "peak_rss_bytes": 4021149696
+    },
+    "candidate": {
+      "min_seconds": 19.41918435302796,
+      "median_seconds": 19.41918435302796,
+      "max_seconds": 19.41918435302796,
+      "peak_rss_bytes": 4014747648
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 27.014060241985135,
+      "peak_rss_bytes": 4021149696,
+      "exit_code": 0,
+      "stderr": "setup=2.29651 parse_events=10.2167 dedup_events=3.97437 clicks=1.74799 sessionize_aggregate=6.21903 write_parquet=0.978605 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":25.4416}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 19.41918435302796,
+      "peak_rss_bytes": 4014747648,
+      "exit_code": 0,
+      "stderr": "setup=1.76399 parse_events=4.59498 dedup_events=4.1746 clicks=3.29168 sessionize_aggregate=3.57013 write_parquet=1.20531 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":18.6123}"
+    }
+  ],
+  "timing_context": "Exploratory only: overlapped correctness checks; excluded from reported speedup."
+}

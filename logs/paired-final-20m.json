@@ -1,0 +1,91 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "data": "dev-tools/scale-20m",
+  "threads": 8,
+  "commands": {
+    "baseline": "build/baseline-c697d57/build/shopping-sessions",
+    "candidate": "build/shopping-sessions"
+  },
+  "method": "alternating order; fresh processes and outputs; caches not flushed; no samples discarded",
+  "correctness": "Both complete tables matched exactly in all 4 rounds",
+  "summary": {
+    "baseline": {
+      "min_seconds": 17.776766143011628,
+      "median_seconds": 18.129583866000758,
+      "max_seconds": 19.881914374011103,
+      "peak_rss_bytes": 4034560000
+    },
+    "candidate": {
+      "min_seconds": 13.02209495799616,
+      "median_seconds": 14.080950532501447,
+      "max_seconds": 17.079527533001965,
+      "peak_rss_bytes": 3890720768
+    }
+  },
+  "runs": [
+    {
+      "round": 1,
+      "implementation": "baseline",
+      "wall_seconds": 18.257797994010616,
+      "peak_rss_bytes": 4028207104,
+      "exit_code": 0,
+      "stderr": "setup=1.64279 parse_events=4.01657 dedup_events=2.42157 clicks=1.43604 sessionize_aggregate=5.99717 write_parquet=1.0971 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":16.6199}"
+    },
+    {
+      "round": 1,
+      "implementation": "candidate",
+      "wall_seconds": 13.02209495799616,
+      "peak_rss_bytes": 3882344448,
+      "exit_code": 0,
+      "stderr": "setup=2.29889 parse_events=3.64063 dedup_events=2.0387 clicks=1.27636 sessionize_aggregate=2.62606 write_parquet=0.936144 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":12.8256}"
+    },
+    {
+      "round": 2,
+      "implementation": "candidate",
+      "wall_seconds": 17.079527533001965,
+      "peak_rss_bytes": 3890720768,
+      "exit_code": 0,
+      "stderr": "setup=2.43239 parse_events=7.30769 dedup_events=2.13047 clicks=1.38092 sessionize_aggregate=2.62912 write_parquet=0.986817 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":16.8765}"
+    },
+    {
+      "round": 2,
+      "implementation": "baseline",
+      "wall_seconds": 19.881914374011103,
+      "peak_rss_bytes": 4027715584,
+      "exit_code": 0,
+      "stderr": "setup=1.6673 parse_events=4.14638 dedup_events=3.71185 clicks=1.91895 sessionize_aggregate=6.08709 write_parquet=1.11704 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":18.6571}"
+    },
+    {
+      "round": 3,
+      "implementation": "baseline",
+      "wall_seconds": 17.776766143011628,
+      "peak_rss_bytes": 4034273280,
+      "exit_code": 0,
+      "stderr": "setup=1.567 parse_events=4.21756 dedup_events=2.64504 clicks=1.52193 sessionize_aggregate=5.64457 write_parquet=1.1124 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":16.7168}"
+    },
+    {
+      "round": 3,
+      "implementation": "candidate",
+      "wall_seconds": 14.209499907999998,
+      "peak_rss_bytes": 3873341440,
+      "exit_code": 0,
+      "stderr": "setup=2.23312 parse_events=4.09517 dedup_events=2.53126 clicks=1.41186 sessionize_aggregate=2.78661 write_parquet=0.929699 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":13.9966}"
+    },
+    {
+      "round": 4,
+      "implementation": "candidate",
+      "wall_seconds": 13.952401157002896,
+      "peak_rss_bytes": 3889766400,
+      "exit_code": 0,
+      "stderr": "setup=2.25965 parse_events=3.38896 dedup_events=1.92267 clicks=1.27565 sessionize_aggregate=3.66207 write_parquet=1.22056 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":13.7401}"
+    },
+    {
+      "round": 4,
+      "implementation": "baseline",
+      "wall_seconds": 18.0013697379909,
+      "peak_rss_bytes": 4034560000,
+      "exit_code": 0,
+      "stderr": "setup=1.65255 parse_events=4.16603 dedup_events=3.02083 clicks=1.59513 sessionize_aggregate=5.68846 write_parquet=0.896789 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":17.0286}"
+    }
+  ]
+}

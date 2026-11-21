@@ -1,0 +1,94 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "command": [
+    "build/shopping-sessions"
+  ],
+  "data": "fixtures/A1/input",
+  "threads": 8,
+  "clock": "CLOCK_MONOTONIC in both processes",
+  "filesystem_cache": "not flushed; repeated runs may be warm",
+  "medians": {
+    "wall_seconds": 0.195717,
+    "launch_seconds": 0.189175,
+    "pipeline_seconds": 0.00474427,
+    "local_cleanup_seconds": 0.00010805999999999923,
+    "shutdown_seconds": 0.00202
+  },
+  "runs": [
+    {
+      "run": 1,
+      "wall_seconds": 0.194428,
+      "launch_seconds": 0.188006,
+      "pipeline_seconds": 0.00429665,
+      "local_cleanup_seconds": 0.00012335000000000037,
+      "shutdown_seconds": 0.002002,
+      "totals": {
+        "user_rows": 1,
+        "campaign_rows": 1,
+        "sessions": 1,
+        "events": 1,
+        "revenue_cents": 0
+      }
+    },
+    {
+      "run": 2,
+      "wall_seconds": 0.194354,
+      "launch_seconds": 0.187498,
+      "pipeline_seconds": 0.00474427,
+      "local_cleanup_seconds": 9.172999999999994e-05,
+      "shutdown_seconds": 0.00202,
+      "totals": {
+        "user_rows": 1,
+        "campaign_rows": 1,
+        "sessions": 1,
+        "events": 1,
+        "revenue_cents": 0
+      }
+    },
+    {
+      "run": 3,
+      "wall_seconds": 0.208851,
+      "launch_seconds": 0.201097,
+      "pipeline_seconds": 0.00541703,
+      "local_cleanup_seconds": 0.00014297000000000008,
+      "shutdown_seconds": 0.002194,
+      "totals": {
+        "user_rows": 1,
+        "campaign_rows": 1,
+        "sessions": 1,
+        "events": 1,
+        "revenue_cents": 0
+      }
+    },
+    {
+      "run": 4,
+      "wall_seconds": 0.204416,
+      "launch_seconds": 0.196863,
+      "pipeline_seconds": 0.00492094,
+      "local_cleanup_seconds": 0.00010805999999999923,
+      "shutdown_seconds": 0.002524,
+      "totals": {
+        "user_rows": 1,
+        "campaign_rows": 1,
+        "sessions": 1,
+        "events": 1,
+        "revenue_cents": 0
+      }
+    },
+    {
+      "run": 5,
+      "wall_seconds": 0.195717,
+      "launch_seconds": 0.189175,
+      "pipeline_seconds": 0.00446106,
+      "local_cleanup_seconds": 9.093999999999942e-05,
+      "shutdown_seconds": 0.00199,
+      "totals": {
+        "user_rows": 1,
+        "campaign_rows": 1,
+        "sessions": 1,
+        "events": 1,
+        "revenue_cents": 0
+      }
+    }
+  ]
+}

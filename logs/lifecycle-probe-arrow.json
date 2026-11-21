@@ -1,0 +1,64 @@
+{
+  "platform": "macOS-15.2-x86_64-i386-64bit",
+  "command": [
+    "build/loader-probe-arrow"
+  ],
+  "data": "fixtures/A1/input",
+  "threads": 8,
+  "clock": "CLOCK_MONOTONIC in both processes",
+  "filesystem_cache": "not flushed; repeated runs may be warm",
+  "medians": {
+    "wall_seconds": 0.190275,
+    "launch_seconds": 0.188373,
+    "pipeline_seconds": 0,
+    "local_cleanup_seconds": 1.6e-05,
+    "shutdown_seconds": 0.001739
+  },
+  "runs": [
+    {
+      "run": 1,
+      "wall_seconds": 0.623728,
+      "launch_seconds": 0.621969,
+      "pipeline_seconds": 0,
+      "local_cleanup_seconds": 2e-05,
+      "shutdown_seconds": 0.001739,
+      "totals": {}
+    },
+    {
+      "run": 2,
+      "wall_seconds": 0.197782,
+      "launch_seconds": 0.196094,
+      "pipeline_seconds": 0,
+      "local_cleanup_seconds": 1.7e-05,
+      "shutdown_seconds": 0.001671,
+      "totals": {}
+    },
+    {
+      "run": 3,
+      "wall_seconds": 0.189362,
+      "launch_seconds": 0.18711,
+      "pipeline_seconds": 0,
+      "local_cleanup_seconds": 1.6e-05,
+      "shutdown_seconds": 0.002236,
+      "totals": {}
+    },
+    {
+      "run": 4,
+      "wall_seconds": 0.187621,
+      "launch_seconds": 0.185941,
+      "pipeline_seconds": 0,
+      "local_cleanup_seconds": 1.6e-05,
+      "shutdown_seconds": 0.001664,
+      "totals": {}
+    },
+    {
+      "run": 5,
+      "wall_seconds": 0.190275,
+      "launch_seconds": 0.188373,
+      "pipeline_seconds": 0,
+      "local_cleanup_seconds": 1.6e-05,
+      "shutdown_seconds": 0.001886,
+      "totals": {}
+    }
+  ]
+}

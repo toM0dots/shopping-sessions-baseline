@@ -5,5 +5,9 @@ set -eu
 export DATA_DIR OUTPUT_DIR SCRATCH_DIR
 # Read-only root filesystem: everything that wants a temp or home dir gets /scratch.
 export TMPDIR="$SCRATCH_DIR" HOME="$SCRATCH_DIR"
-APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Shell parameter expansion avoids launching dirname on every timed run.
+case "$0" in
+  */*) APP_DIR=${0%/*} ;;
+  *) APP_DIR=. ;;
+esac
 exec "$APP_DIR/build/shopping-sessions"

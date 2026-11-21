@@ -12,3 +12,4 @@ out-*/
 logs/*.prof
 logs/*.stdout
 logs/*.stderr
+logs/arrow-*.log
