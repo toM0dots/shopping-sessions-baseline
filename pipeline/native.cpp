@@ -943,6 +943,39 @@ template <class T, class Less> static void sort_run(T *first, T *last, Less less
         *j = value;
     }
 }
+// Stable LSD radix sort on key(row), whose values lie in [0, span]: 11 bits
+// per pass (a 14-day window in milliseconds takes three). Passes in which every
+// row has the same digit are skipped. Meant for cache-sized arrays.
+template <class T, class KeyOf>
+static void radix_sort(std::vector<T> &rows, std::vector<T> &scratch, uint64_t span, KeyOf key) {
+    constexpr unsigned BITS = 11, BUCKETS = 1u << BITS;
+    unsigned passes = 0;
+    while (passes * BITS < 64 && (span >> (passes * BITS)))
+        ++passes;
+    if (rows.size() < 2 || !passes)
+        return;
+    scratch.resize(rows.size());
+    std::vector<uint32_t> counts(size_t(passes) * BUCKETS);
+    for (const auto &r : rows) {
+        uint64_t k = key(r);
+        for (unsigned p = 0; p < passes; ++p)
+            ++counts[p * BUCKETS + ((k >> (p * BITS)) & (BUCKETS - 1))];
+    }
+    for (unsigned p = 0; p < passes; ++p) {
+        uint32_t *c = &counts[p * BUCKETS];
+        if (c[(key(rows[0]) >> (p * BITS)) & (BUCKETS - 1)] == rows.size())
+            continue;
+        uint32_t sum = 0;
+        for (unsigned b = 0; b < BUCKETS; ++b) {
+            uint32_t n = c[b];
+            c[b] = sum;
+            sum += n;
+        }
+        for (const auto &r : rows)
+            scratch[c[(key(r) >> (p * BITS)) & (BUCKETS - 1)]++] = r;
+        rows.swap(scratch);
+    }
+}
 // Shard-local person interning. Hashes were computed during parsing; full
 // names are still compared whenever hashes match, so grouping stays exact.
 class PersonTable {
@@ -954,7 +987,9 @@ class PersonTable {
     std::vector<Entry> entries;
     std::vector<Key> names;
     size_t mask;
-    size_t index(uint64_t hash) const { return (hash / SHARDS) & mask; }
+    // Bits 0-11 select a record's shard and piece, so all keys in one table
+    // share them: index on the bits above.
+    size_t index(uint64_t hash) const { return (hash >> 12) & mask; }
 
   public:
     // Requests a record's slot and name bytes before intern() or find().
@@ -1155,7 +1190,7 @@ static void write_table(const fs::path &path, std::shared_ptr<arrow::Table> tabl
 }
 // Rows from shards [first, last) form one Parquet part file.
 static void write_users(const fs::path &path,
-                        const std::array<std::vector<UserRow>, SHARDS> &results, size_t first,
+                        const std::vector<std::vector<UserRow>> &results, size_t first,
                         size_t last, const std::vector<SV> &categories) {
     arrow::StringBuilder user, category;
     arrow::Date32Builder day;
@@ -1363,90 +1398,107 @@ static int run() {
             });
         });
         timing("clicks");
-        // Resolve each shard's users to canonical IDs against its own identity
-        // shard, rewriting them in place. A record whose person lives in another
-        // shard stays here (its home shard skips it: its user now hashes
-        // elsewhere) and that shard receives a pointer to it.
-        std::array<Partitions<const EventRec *>, SHARDS> moved_events;
-        std::array<Partitions<const ClickRec *>, SHARDS> moved_clicks;
+        // Cache-sized pieces. Each shard's records are resolved against that
+        // shard's identity table and split by six more bits of the canonical
+        // user's hash into PIECES pieces of a few thousand events; a record whose
+        // person lives in another shard is copied there. Each piece is then
+        // aggregated on its own: its person table, records and sort fit in a
+        // core's cache, and 4096 small jobs keep threads evenly loaded.
+        constexpr size_t PIECES = 64;
+        struct PieceEvent {
+            Key person; // canonical
+            I64 ts;
+            int cents;
+            uint32_t category;
+        };
+        struct PieceClick {
+            Key person, id;
+            I64 ts;
+            uint32_t campaign;
+        };
+        auto piece_of = [](uint64_t h) { return size_t(h >> 6) & (PIECES - 1); };
+        std::vector<std::array<BlockList<PieceEvent>, PIECES>> piece_events(SHARDS);
+        std::vector<std::array<BlockList<PieceClick>, PIECES>> piece_clicks(SHARDS);
+        std::array<Partitions<PieceEvent>, SHARDS> moved_events; // [from][to]
+        std::array<Partitions<PieceClick>, SHARDS> moved_clicks;
         parallel(SHARDS, threads, [&](size_t shard, size_t) {
-            auto resolve = [&](auto &list, auto &moved) {
-                using Rec = std::remove_const_t<std::remove_reference_t<decltype(*list.first())>>;
-                each_ahead_mut(
-                    list, [&](Rec &r) { people.prefetch(r.user.hash()); },
-                    [&](Rec &r) {
-                        if (r.user.empty())
+            for (auto &p : events_by_user) {
+                each_ahead(
+                    p[shard], [&](const EventRec &e) { people.prefetch(e.user.hash()); },
+                    [&](const EventRec &e) {
+                        if (e.user.empty())
                             return;
-                        const Key &canon = people.canonical(r.user, r.user.hash());
-                        if (canon == r.user)
-                            return;
-                        size_t to = canon.hash() & (SHARDS - 1);
-                        r.user = canon;
-                        if (to != shard)
-                            moved[to].push_back(&r);
+                        uint64_t h = e.user.hash();
+                        const Key &canon = people.canonical(e.user, h);
+                        if (canon != e.user)
+                            h = canon.hash();
+                        PieceEvent pe{canon, e.ts, e.cents, e.category};
+                        size_t to = h & (SHARDS - 1);
+                        if (to == shard)
+                            piece_events[shard][piece_of(h)].push_back(pe);
+                        else
+                            moved_events[shard][to].push_back(pe);
                     });
-            };
-            for (auto &p : events_by_user)
-                resolve(p[shard], moved_events[shard]);
-            for (auto &p : clicks_by_user)
-                resolve(p[shard], moved_clicks[shard]);
+                p[shard].release();
+            }
+            for (auto &p : clicks_by_user) {
+                each_ahead(
+                    p[shard], [&](const ClickRec &c) { people.prefetch(c.user.hash()); },
+                    [&](const ClickRec &c) {
+                        uint64_t h = c.user.hash();
+                        const Key &canon = people.canonical(c.user, h);
+                        if (canon != c.user)
+                            h = canon.hash();
+                        PieceClick pc{canon, c.id, c.ts, c.campaign};
+                        size_t to = h & (SHARDS - 1);
+                        if (to == shard)
+                            piece_clicks[shard][piece_of(h)].push_back(pc);
+                        else
+                            moved_clicks[shard][to].push_back(pc);
+                    });
+                p[shard].release();
+            }
+        });
+        parallel(SHARDS, threads, [&](size_t shard, size_t) {
+            for (size_t from = 0; from < SHARDS; ++from) {
+                auto &me = moved_events[from][shard];
+                me.each([&](const PieceEvent &e) { piece_events[shard][piece_of(e.person.hash())].push_back(e); });
+                me.release();
+                auto &mc = moved_clicks[from][shard];
+                mc.each([&](const PieceClick &c) { piece_clicks[shard][piece_of(c.person.hash())].push_back(c); });
+                mc.release();
+            }
         });
         timing("resolve");
-        std::array<std::vector<UserRow>, SHARDS> user_rows;
+        std::vector<std::vector<UserRow>> user_rows(threads);
         std::vector<CampaignAccumulator> campaign_rows;
-        size_t aggregate_workers = std::min(SHARDS, threads);
-        for (size_t i = 0; i < aggregate_workers; ++i)
+        for (size_t i = 0; i < threads; ++i)
             campaign_rows.emplace_back(campaigns.size(), floor_day(lo),
-                                       floor_day(hi - 1) - floor_day(lo) + 1, aggregate_workers);
-        parallel(SHARDS, threads, [&](size_t shard, size_t worker) {
-            // This shard's records: those stored here whose canonical user is
-            // still in this shard, then those pointed to from other shards.
-            // f(record, hash) for each; hashes are of the canonical user.
-            auto each_record = [&](auto &by_user, auto &moved, auto prefetch, auto f) {
-                using Rec = std::remove_const_t<std::remove_pointer_t<
-                    std::remove_reference_t<decltype(*moved[0][0].first())>>>;
-                for (auto &p : by_user)
-                    each_ahead(
-                        p[shard], [&](const Rec &r) { prefetch(r.user.hash()); },
-                        [&](const Rec &r) {
-                            if (r.user.empty())
-                                return;
-                            uint64_t h = r.user.hash();
-                            if ((h & (SHARDS - 1)) == shard)
-                                f(r, h);
-                        });
-                for (auto &m : moved)
-                    each_ahead(
-                        m[shard], [&](const Rec *const &r) { __builtin_prefetch(r); },
-                        [&](const Rec *const &r) { f(*r, r->user.hash()); });
-            };
-            size_t ne = 0, nc = 0;
-            for (auto &p : events_by_user)
-                ne += p[shard].size();
-            for (auto &m : moved_events)
-                ne += m[shard].size();
-            for (auto &p : clicks_by_user)
-                nc += p[shard].size();
-            for (auto &m : moved_clicks)
-                nc += m[shard].size();
+                                       floor_day(hi - 1) - floor_day(lo) + 1, threads);
+        parallel(SHARDS * PIECES, threads, [&](size_t job, size_t worker) {
+            auto &piece_e = piece_events[job / PIECES][job % PIECES];
+            auto &piece_c = piece_clicks[job / PIECES][job % PIECES];
             // Intern persons, then group each person's records contiguously with
-            // a counting sort. Output row order is irrelevant; only per-person
-            // time order matters, so just the short runs are sorted.
+            // a counting sort; only the per-person runs are sorted by time.
             constexpr uint32_t NONE = UINT32_MAX;
-            PersonTable people_here(ne / 8 + 16);
-            // One pass interns each record's person and copies its fields into
-            // a compact array; a second places them by person (counting sort).
+            PersonTable people_here(piece_e.size() / 8 + 16);
             struct PersonEvent {
                 uint32_t person;
                 CompactEvent event;
             };
             std::vector<PersonEvent> gathered;
-            gathered.reserve(ne);
-            each_record(
-                events_by_user, moved_events, [&](uint64_t h) { people_here.prefetch(h); },
-                [&](const EventRec &e, uint64_t h) {
-                    gathered.push_back({people_here.intern({e.user, h}), {e.ts, e.cents, e.category}});
-                });
+            gathered.reserve(piece_e.size());
+            piece_e.each([&](const PieceEvent &e) {
+                gathered.push_back({people_here.intern({e.person, e.person.hash()}), {e.ts, e.cents, e.category}});
+            });
+            piece_e.release();
+            // Radix-sort the piece by time; the stable counting sort by person
+            // below then leaves every person's events in time order.
+            {
+                std::vector<PersonEvent> scratch;
+                radix_sort(gathered, scratch, uint64_t(hi - 1 - lo),
+                           [&](const PersonEvent &g) { return uint64_t(g.event.ts - lo); });
+            }
             size_t np = people_here.size();
             std::vector<uint32_t> event_start(np + 1), click_start(np + 1);
             for (auto &g : gathered)
@@ -1465,14 +1517,18 @@ static int run() {
                 CompactClick click;
             };
             std::vector<PersonClick> gathered_clicks;
-            gathered_clicks.reserve(nc);
-            each_record(
-                clicks_by_user, moved_clicks, [&](uint64_t h) { people_here.prefetch(h); },
-                [&](const ClickRec &c, uint64_t h) {
-                    auto p = people_here.find({c.user, h});
-                    if (p != NONE)
-                        gathered_clicks.push_back({p, {c.id, c.ts, c.campaign}});
-                });
+            gathered_clicks.reserve(piece_c.size());
+            piece_c.each([&](const PieceClick &c) {
+                auto p = people_here.find({c.person, c.person.hash()});
+                if (p != NONE)
+                    gathered_clicks.push_back({p, {c.id, c.ts, c.campaign}});
+            });
+            piece_c.release();
+            {
+                std::vector<PersonClick> scratch;
+                radix_sort(gathered_clicks, scratch, uint64_t(hi - 1 - (lo - REACH)),
+                           [&](const PersonClick &g) { return uint64_t(g.click.ts - (lo - REACH)); });
+            }
             for (auto &g : gathered_clicks)
                 ++click_start[g.person + 1];
             for (size_t p = 0; p < np; ++p)
@@ -1484,15 +1540,21 @@ static int run() {
                     clicks[fill[g.person]++] = g.click;
             }
             std::vector<PersonClick>().swap(gathered_clicks);
-            auto event_less = [](const CompactEvent &a, const CompactEvent &b) { return a.ts < b.ts; };
-            auto click_less = [](const CompactClick &a, const CompactClick &b) {
-                return a.ts != b.ts ? a.ts < b.ts : b.id < a.id;
-            };
+            // A person's clicks at the same millisecond: the smallest ID must come
+            // last. Tie groups never cross into the next person's range.
             for (size_t p = 0; p < np; ++p) {
-                sort_run(events.data() + event_start[p], events.data() + event_start[p + 1], event_less);
-                sort_run(clicks.data() + click_start[p], clicks.data() + click_start[p + 1], click_less);
+                size_t end = click_start[p + 1];
+                for (size_t i = click_start[p] + 1; i < end; ++i)
+                    if (clicks[i].ts == clicks[i - 1].ts) {
+                        size_t first = i - 1, last = i + 1;
+                        while (last < end && clicks[last].ts == clicks[first].ts)
+                            ++last;
+                        std::sort(clicks.begin() + first, clicks.begin() + last,
+                                  [](const CompactClick &a, const CompactClick &b) { return b.id < a.id; });
+                        i = last - 1;
+                    }
             }
-            auto &rows = user_rows[shard];
+            auto &rows = user_rows[worker];
             auto &daily = campaign_rows[worker];
             std::vector<I64> category_revenue(categories.size());
             std::vector<uint32_t> active_counts(campaigns.size()), positions(campaigns.size()),
@@ -1569,13 +1631,13 @@ static int run() {
             total_rows += part.size();
         size_t parts = std::max<size_t>(1, std::min(threads, total_rows / 262144));
         std::vector<size_t> bounds{0};
-        for (size_t s = 0, acc = 0; s < SHARDS; ++s) {
+        for (size_t s = 0, acc = 0; s < user_rows.size(); ++s) {
             acc += user_rows[s].size();
             if (bounds.size() < parts && acc * parts >= total_rows * bounds.size())
                 bounds.push_back(s + 1);
         }
         bounds.resize(parts);
-        bounds.push_back(SHARDS);
+        bounds.push_back(user_rows.size());
         parallel(parts + 1, std::min(threads, parts + 1), [&](size_t i, size_t) {
             if (i == parts)
                 write_campaigns(out, daily, campaigns);
