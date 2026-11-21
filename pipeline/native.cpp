@@ -240,7 +240,7 @@ template <class Row> class DedupTable {
     }
     // Inserts rows in order, prefetching each slot a few rows in advance.
     template <class List, class F> void insert_all(const List &list, F f) {
-        each_ahead(list, [&](const Row &r) { prefetch(r.hash); }, f);
+        each_ahead(list, [&](const Row &r) { prefetch(r.id.hash()); }, f);
     }
 };
 
@@ -742,8 +742,11 @@ class Identity {
     }
 };
 
+// Records carry keys but no hashes: a Key rehashes in a few nanoseconds from
+// bytes already in the record, which is cheaper than moving 8 more bytes of
+// every record through memory at each partitioning step.
 struct Event {
-    PersonRef person;
+    Key person; // canonical
     I64 ts;
     int cents;
     uint32_t category;
@@ -751,16 +754,14 @@ struct Event {
 struct RawEvent {
     Key id;
     I64 ingest;
-    uint64_t hash;
     Event event;
 };
 struct Click {
-    Key id;
-    PersonRef person;
-    uint64_t hash; // of id
+    Key id, person;
     I64 ts;
     uint32_t campaign;
 };
+static_assert(sizeof(Event) == 32 && sizeof(RawEvent) == 56 && sizeof(Click) == 48);
 // After interning, each person's records are grouped by a counting sort and
 // only the short per-person runs are ordered by time.
 struct CompactEvent {
@@ -803,7 +804,7 @@ class PersonTable {
 
   public:
     // Requests a record's slot and name bytes before intern() or find().
-    void prefetch(const PersonRef &p) const { __builtin_prefetch(&entries[index(p.hash)]); }
+    void prefetch(uint64_t hash) const { __builtin_prefetch(&entries[index(hash)]); }
     explicit PersonTable(size_t n) {
         size_t cap = 16;
         while (cap / 2 < n)
@@ -1106,7 +1107,7 @@ static int run() {
                 [&](auto &r, const PersonRef &user) {
                 if (r[0].empty())
                     return;
-                Event event{{}, BAD, 0, 0};
+                Event event{Key{}, BAD, 0, 0};
                 // ingest_ts is guaranteed valid F1; integer ordering is the
                 // same as its original lexical ordering. Reuse this parse for
                 // lateness and deduplication, even for invalid winning events.
@@ -1124,13 +1125,12 @@ static int run() {
                             if (auto product = products.find(r[5]))
                                 category = *product;
                         }
-                        event = {people.person(user), ts, cents, category};
+                        event = {people.person(user).name, ts, cents, category};
                     }
                 }
                 // Invalid winners must remain present until global ID deduplication.
                 Key id = Key::of(r[0]);
-                uint64_t hash = id.hash();
-                parsed[worker][hash & (SHARDS - 1)].push_back({id, ingest, hash, event});
+                parsed[worker][id.hash() & (SHARDS - 1)].push_back({id, ingest, event});
             });
         });
         timing("parse_events");
@@ -1142,13 +1142,13 @@ static int run() {
             DedupTable<RawEvent> unique(count);
             for (auto &p : parsed)
                 unique.insert_all(p[shard], [&](const RawEvent &r) {
-                    auto &old = unique.slot(r, r.hash);
+                    auto &old = unique.slot(r, r.id.hash());
                     if (!old || r.ingest < old->ingest)
                         old = &r;
                 });
             unique.each([&](auto *r) {
                 if (r->event.ts != BAD)
-                    event_parts[shard][r->event.person.hash & (SHARDS - 1)].push_back(r->event);
+                    event_parts[shard][r->event.person.hash() & (SHARDS - 1)].push_back(r->event);
             });
             // Winners were copied out, so this shard's raw rows can go now,
             // which lowers the peak while other shards are still deduplicated.
@@ -1179,9 +1179,8 @@ static int run() {
                     return;
                 // Click duplicates are identical after unquoting, so validation commutes.
                 Key id = Key::of(r[0]);
-                uint64_t hash = id.hash();
-                parsed_clicks[worker][hash & (SHARDS - 1)].push_back(
-                    {id, people.person(user), hash, ts, *c});
+                parsed_clicks[worker][id.hash() & (SHARDS - 1)].push_back(
+                    {id, people.person(user).name, ts, *c});
             });
         });
         std::array<Partitions<Click>, SHARDS> click_parts;
@@ -1191,9 +1190,9 @@ static int run() {
                 count += p[shard].size();
             DedupTable<Click> unique(count);
             for (auto &p : parsed_clicks)
-                unique.insert_all(p[shard], [&](const Click &r) { unique.slot(r, r.hash) = &r; });
+                unique.insert_all(p[shard], [&](const Click &r) { unique.slot(r, r.id.hash()) = &r; });
             unique.each([&](auto *c) {
-                click_parts[shard][c->person.hash & (SHARDS - 1)].push_back(*c);
+                click_parts[shard][c->person.hash() & (SHARDS - 1)].push_back(*c);
             });
             for (auto &p : parsed_clicks)
                 p[shard].release();
@@ -1222,8 +1221,11 @@ static int run() {
                 size_t k = 0;
                 for (size_t s = 0; s < SHARDS; ++s)
                     each_ahead(
-                        event_parts[s][shard], [&](const Event &e) { people_here.prefetch(e.person); },
-                        [&](const Event &e) { event_person[k++] = people_here.intern(e.person); });
+                        event_parts[s][shard],
+                        [&](const Event &e) { people_here.prefetch(e.person.hash()); },
+                        [&](const Event &e) {
+                            event_person[k++] = people_here.intern({e.person, e.person.hash()});
+                        });
             }
             size_t np = people_here.size();
             std::vector<uint32_t> event_start(np + 1), click_start(np + 1);
@@ -1249,9 +1251,10 @@ static int run() {
                 size_t k = 0;
                 for (size_t s = 0; s < SHARDS; ++s)
                     each_ahead(
-                        click_parts[s][shard], [&](const Click &c) { people_here.prefetch(c.person); },
+                        click_parts[s][shard],
+                        [&](const Click &c) { people_here.prefetch(c.person.hash()); },
                         [&](const Click &c) {
-                        auto p = people_here.find(c.person);
+                        auto p = people_here.find({c.person, c.person.hash()});
                         click_person[k++] = p;
                         if (p != UINT32_MAX)
                             ++click_start[p + 1];
