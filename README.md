@@ -4,6 +4,58 @@ Native C++ implementation of the [Shopping Sessions challenge](https://www.joinb
 with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
 The default runner executes the compiled native pipeline and writes both Parquet tables.
 
+## Latest update: parallel identity and leaner partitions
+
+Fresh-process paired runs against the previous `main` (`b617b8a`), alternating order, `NCPU=4`.
+Both complete tables matched in every round:
+
+| Input (surrogate) | Rounds | Previous median | Updated median | Runtime reduction |
+| --- | ---: | ---: | ---: | ---: |
+| 1M events / 250K clicks / 12.5K links | 10 | 0.256 s | **0.208 s** | **19%** |
+| 20M events / 5M clicks / 250K links | 6 | 6.042 s | **3.022 s** | **50%** |
+| 20M events / 5M clicks / 2M links | 6 | 7.488 s | **3.584 s** | **52%** |
+
+Measured in a Linux x86-64 cloud container, 4 vCPUs, 15 GiB RAM, against Arrow from the PyArrow
+19.0.1 wheel (`make native-wheel`). The official generator was not reachable from that
+environment, so these inputs come from `scripts/surrogate_gen.cpp`. It reproduces the file formats,
+duplicate and malformed rows, mixed timestamp formats and linked device IDs. It is **not** the
+official generator, and absolute times are not comparable with the figures below. Peak RSS was
+4.39 GiB versus 4.58 GiB on the 250K-link input and 4.68 versus 4.75 GiB on the 2M-link input.
+Reports: `logs/paired-v4-surrogate-*.json`.
+
+What changed, by phase (20M, 250K links, first paired round):
+
+| Phase | Previous | Updated | Change |
+| --- | ---: | ---: | --- |
+| setup (links) | 0.20 s | 0.07 s | Parallel hash-sharded interning, integer union-find, concurrent naming |
+| parse_events | 1.52 s | 0.95 s | Per-chunk SSE2 splitter, append-only block buffers, batched lookup prefetch |
+| dedup_events | 0.97 s | 0.46 s | Person hashes computed once at parse time; prefetched probes |
+| clicks | 0.76 s | 0.50 s | Cached click-ID hashes; same buffers and prefetch |
+| sessionize_aggregate | 1.72 s | 0.63 s | Grouping uses cached hashes and shard-local tables, never rehashing input |
+| write_parquet | 0.79 s | 0.24 s | Large `user_daily` tables are written as concurrently encoded part files |
+
+The validated date-prefix cache in `timestamp()` and the SSE2 `rows()` scanner from
+`af0ae36` are retained. `rows()` still parses lookups and any line that contains a quote.
+
+Large `user_daily` outputs, at least 262,144 rows per part, are written as up to `NCPU` files,
+`part-0.parquet` … `part-N.parquet`, in the same directory. The unmodified official checker
+(`scripts/run_fixtures.py`, `scripts/compare.py`) reads every `*.parquet` file there. Smaller
+outputs, including all fixtures and the public 1M answer, stay a single `part-0.parquet`.
+
+Validation of this update:
+
+- 36/36 official fixtures pass, with the SSE2 splitter and with the portable scalar fallback.
+- All three surrogate inputs match the previous `main` exactly. The 1M surrogate also matches the
+  Python reference.
+- `scripts/fuzz_reference.py` checks 150 adversarial small inputs against the Python reference
+  at `NCPU=1` and `NCPU=3` with no differences. The inputs include quotes, CRs, missing final LFs,
+  malformed rows, self and chained links, duplicates and boundary timestamps.
+- `scripts/check_parser_semantics.py` passes, SIMD and scalar: 361,548 CSV and 203,052 timestamp
+  comparisons.
+- The static-Arrow container build and all fixtures pass in the `native.yml` workflow.
+- The public 1M answer, the hidden portal input and the 60M workload were not available
+  for this update.
+
 ## Runtime and measurement context
 
 The [portal practice workload](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions)
@@ -153,6 +205,12 @@ cargo build --release --manifest-path generator/Cargo.toml
 generator/target/release/generate --seed 1 --events 1000000 \
   --clicks 250000 --threads 4 --output dev
 python scripts/check_generated.py generator/target/release/generate
+python scripts/fuzz_reference.py 150 -- sh run.sh
+# Surrogate inputs used for the latest update (not the official generator):
+c++ -O2 -pthread -std=c++17 scripts/surrogate_gen.cpp -o build/surrogate_gen
+LINK_STYLE=anon build/surrogate_gen dev-tools/surrogate/s1m 1000000 250000 4 1
+LINK_STYLE=anon build/surrogate_gen dev-tools/surrogate/s20m 20000000 5000000 4 17
+LINKS_PER_100_USERS=200 build/surrogate_gen dev-tools/surrogate/s20mL 20000000 5000000 4 23
 ```
 
 To reproduce the larger comparison, set `BASELINE` to an executable built from
@@ -195,21 +253,30 @@ binary directly, without Python initialization or network access.
 ## Implementation
 
 - Read-only memory maps retain input strings without copying each field.
-- Parallel SSE2 CSV scanning (with scalar fallback) preserves LF-only records, carriage returns, exact
-  whitespace and quoting, and strict ASCII digit/calendar validation.
-- Transitive union-find links use the smallest UTF-8 bytewise ID as the person;
-  a contiguous map is canonicalized in place for subsequent identity queries.
+- Parallel CSV parsing preserves LF-only records, carriage returns, exact
+  whitespace and quoting, and strict ASCII digit/calendar validation. One SSE2
+  pass finds commas, quotes and LFs; lines containing a quote use the exact
+  field-by-field parser. A scalar fallback covers non-x86 builds.
+- Link IDs are interned in parallel into 64 hash-sharded tables. Union-find runs on
+  dense integers, and each component is named by its smallest UTF-8 bytewise ID
+  (concurrent compare-and-swap minimum). The frozen shard tables then serve every
+  identity query, and rows are buffered so their lookups can be prefetched.
 - ID-partitioned deduplication retains invalid early event copies as blockers;
   cached hashes select buckets and full IDs resolve collisions. Validation flags
   are applied only after choosing the winner.
-- Events and clicks are grouped in linear time by compact person ID, then sorted
-  within each group by time. Session gaps,
-  midnight ownership and click-ID ties follow the official rules exactly.
+- Person hashes are computed once during parsing and carried with each record.
+  Each person shard interns names in an open-addressing table (full names are still
+  compared on hash matches) and groups records with a counting sort. Only each person's
+  short run is sorted by time. Session gaps, midnight ownership and click-ID ties follow
+  the official rules exactly.
+- Partition buffers are append-only block lists, so records are written once and never
+  copied on growth.
 - A sliding seven-day window counts each distinct assisting campaign once.
   Category lookups are performed only for purchases.
 - Arrow C++ writes typed DATE, string, nullable category and integer Parquet
   columns directly; neither Python imports nor Python-to-DuckDB conversion are
-  part of the optimized runtime.
+  part of the optimized runtime. Column encoding is multithreaded, and large user
+  tables are split into concurrently written part files.
 
 The native pipeline reads only the input dataset. It never loads reference
 answers or persists computed results between invocations. It holds intermediate
