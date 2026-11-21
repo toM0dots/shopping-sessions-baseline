@@ -4,7 +4,46 @@ Native C++ implementation of the [Shopping Sessions challenge](https://www.joinb
 with the original Python/DuckDB baseline retained in `pipeline/pipeline.py`.
 The default runner executes the compiled native pipeline and writes both Parquet tables.
 
-## Latest update: measured on the official generator's data
+## Latest update: restructured partitioning
+
+Paired runs against `main` (`f296c69`) on the official generator's datasets, alternating order,
+`NCPU=4`, on the 4-vCPU Linux container described below. Both complete tables matched in every
+round:
+
+| Input (official generator) | Rounds | `main` median | Updated median | Runtime reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Public 1M events / 250K clicks | 10 | 0.223 s | **0.170 s** | **24%** |
+| 20M events / 5M clicks, seed 17 | 6 | 3.994 s | **2.364 s** | **41%** |
+
+Peak RSS on 20M fell from 4.34 to 3.49 GiB. A single-threaded 20M run now costs 8.1 CPU-seconds
+in total: 7.13 s user and 0.97 s system. Reports: `logs/paired-v7-official-*.json`.
+
+This includes the previous section's changes (inline `Key`s, one-pass quoted lines, slimmer
+records). The restructure:
+
+- **Partition by raw user.** Parsing stores each valid event once, 32 bytes with its raw user ID,
+  in that user's shard. It also writes a 32-byte dedup record (event ID, ingest time, pointer) to
+  the event ID's shard. No identity lookup happens while parsing.
+- **Deduplicate by reference.** The earliest copy of each event ID wins; every other stored copy is
+  tombstoned in place by clearing its user. Winners are never copied into new partitions.
+- **Resolve identity per shard.** Identity tables are sharded by the same hash as raw users, so a
+  shard resolves its users against its own small table, rewriting them in place. A record whose
+  person lives in another shard stays put: that shard gets an 8-byte pointer, and the home shard
+  skips the record because its user now hashes elsewhere. About 37% of records cross shards.
+- **No global click deduplication.** Duplicate click lines are identical after unquoting (the
+  property the previous code relied on), and identical clicks change neither the crediting click
+  nor the set of assisting campaigns.
+
+Tried and rejected after measuring on this machine: transparent huge pages for partition
+blocks (faults fell from 577K to 167K, but zeroing each 2 MiB page evicts the core's L2, and
+parsing slowed); `MADV_POPULATE_READ` on the input; cache-sized identity shard tables; radix
+grouping by time instead of per-person sorts; 8-byte packed events in aggregation; and a
+line-at-a-time 128-bit mask splitter. Each was neutral or slower.
+
+Validation: 36/36 fixtures, SSE2, scalar and degenerate-hash builds; 150 reference fuzz cases;
+60 long-ID cases; exact matches on both official datasets.
+
+## Previous update: measured on the official generator's data
 
 All results here use datasets from the official generator: the public 1M set (seed 1) and the
 20M set from the earlier 20M benchmarks (seed 17, 1,921,192,554 bytes). The native output on the
@@ -329,23 +368,30 @@ binary directly, without Python initialization or network access.
 
 - Read-only memory maps retain input strings without copying each field.
 - Parallel CSV parsing preserves LF-only records, carriage returns, exact
-  whitespace and quoting, and strict ASCII digit/calendar validation. One SSE2
-  pass finds commas, quotes and LFs; lines containing a quote use the exact
-  field-by-field parser. A scalar fallback covers non-x86 builds.
+  whitespace and quoting, and strict ASCII digit/calendar validation. One SSE2 pass
+  finds commas, quotes and LFs and validates quotes per field as it scans; a scalar
+  fallback covers non-x86 builds. Workers resolve their own 1 MiB chunk boundaries.
+- IDs of up to 15 bytes (every generated ID) are held by value in a 16-byte `Key`,
+  with the length in byte 15; longer IDs point into the input. Equality and byte-wise
+  order never read cold input, and records carry keys rather than hashes.
 - Link IDs are interned in parallel into 64 hash-sharded tables. Union-find runs on
   dense integers, and each component is named by its smallest UTF-8 bytewise ID
-  (concurrent compare-and-swap minimum). The frozen shard tables then serve every
-  identity query, and rows are buffered so their lookups can be prefetched.
-- ID-partitioned deduplication retains invalid early event copies as blockers;
-  cached hashes select buckets and full IDs resolve collisions. Validation flags
-  are applied only after choosing the winner.
-- Person hashes are computed once during parsing and carried with each record.
-  Each person shard interns names in an open-addressing table (full names are still
-  compared on hash matches) and groups records with a counting sort. Only each person's
-  short run is sorted by time. Session gaps, midnight ownership and click-ID ties follow
+  (concurrent compare-and-swap minimum). Each entry holds the ID and its canonical ID.
+- Parsing stores each valid event once in the shard of its raw user, and writes a
+  dedup record for every event row (valid or not) to its event ID's shard. The earliest
+  copy wins and the others are tombstoned in place, so invalid early copies still block
+  later valid ones; validation flags are applied before choosing the winner only to
+  decide what is stored.
+- Each shard resolves its users against its own identity shard (same hash), rewriting
+  them in place. A record whose person lives elsewhere stays put; that shard receives a
+  pointer. Duplicate click lines are identical after unquoting and change no result, so
+  clicks need no global deduplication.
+- Each person shard interns canonical IDs in an open-addressing table, with full keys
+  compared, and groups records with a counting sort. Short per-person runs are
+  insertion-sorted by time. Session gaps, midnight ownership and click-ID ties follow
   the official rules exactly.
-- Partition buffers are append-only block lists, so records are written once and never
-  copied on growth.
+- Partition buffers are append-only block lists: records never move, so dedup records
+  and cross-shard pointers can address them directly.
 - A sliding seven-day window counts each distinct assisting campaign once.
   Category lookups are performed only for purchases.
 - Arrow C++ writes typed DATE, string, nullable category and integer Parquet
