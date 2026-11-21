@@ -37,25 +37,54 @@ constexpr I64 DAY = 86400000, REACH = 7 * DAY;
 constexpr I64 BAD = std::numeric_limits<I64>::min();
 constexpr size_t SHARDS = 64;
 
-static uint64_t mix(uint64_t h) {
-    h ^= h >> 30;
-    h *= 0xbf58476d1ce4e5b9ULL;
-    h ^= h >> 27;
-    h *= 0x94d049bb133111ebULL;
-    return h ^ (h >> 31);
+// wyhash-style string hash: one 64x64->128-bit multiply per 16 bytes, with
+// overlapping loads for short keys. Values only choose shards and table slots;
+// every table still compares full keys, so outputs never depend on them.
+static inline uint64_t mum(uint64_t a, uint64_t b) {
+    __uint128_t r = static_cast<__uint128_t>(a) * b;
+    return uint64_t(r) ^ uint64_t(r >> 64);
+}
+static inline uint64_t load8(const char *p) {
+    uint64_t v;
+    std::memcpy(&v, p, 8);
+    return v;
+}
+static inline uint64_t load4(const char *p) {
+    uint32_t v;
+    std::memcpy(&v, p, 4);
+    return v;
 }
 struct Hash {
     size_t operator()(SV s) const {
-        uint64_t h = s.size(), v;
-        while (s.size() >= 8) {
-            std::memcpy(&v, s.data(), 8);
-            h = mix(h ^ v);
-            s.remove_prefix(8);
+        constexpr uint64_t k0 = 0xa0761d6478bd642fULL, k1 = 0xe7037ed1a0b428dbULL,
+                           k2 = 0x8ebc6af09c88c6e3ULL;
+        const char *p = s.data();
+        size_t n = s.size();
+        uint64_t seed = k0 ^ n, a, b;
+        if (n <= 16) {
+            if (n >= 8) {
+                a = load8(p);
+                b = load8(p + n - 8);
+            } else if (n >= 4) {
+                a = load4(p);
+                b = load4(p + n - 4);
+            } else if (n) {
+                a = (uint64_t(uint8_t(p[0])) << 16) | (uint64_t(uint8_t(p[n >> 1])) << 8) |
+                    uint8_t(p[n - 1]);
+                b = 0;
+            } else
+                a = b = 0;
+        } else {
+            size_t left = n;
+            while (left > 16) {
+                seed = mum(load8(p) ^ k1, load8(p + 8) ^ seed);
+                p += 16;
+                left -= 16;
+            }
+            a = load8(p + left - 16);
+            b = load8(p + left - 8);
         }
-        v = 0;
-        if (!s.empty())
-            std::memcpy(&v, s.data(), s.size());
-        return mix(h ^ v);
+        return mum(k1 ^ n, mum(a ^ k1, b ^ seed) ^ k2);
     }
 };
 template <class T> using Map = std::unordered_map<SV, T, Hash>;
