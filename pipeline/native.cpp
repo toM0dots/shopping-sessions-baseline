@@ -770,6 +770,21 @@ struct CompactClick {
     I64 ts;
     uint32_t campaign;
 };
+// Most people have a few dozen records, where a plain insertion sort beats
+// std::sort's per-call setup. Longer runs (shared devices) use std::sort.
+template <class T, class Less> static void sort_run(T *first, T *last, Less less) {
+    if (last - first > 32) {
+        std::sort(first, last, less);
+        return;
+    }
+    for (T *i = first + 1; i < last; ++i) {
+        T value = *i;
+        T *j = i;
+        for (; j > first && less(value, j[-1]); --j)
+            *j = j[-1];
+        *j = value;
+    }
+}
 // Shard-local person interning. Hashes were computed during parsing; full
 // names are still compared whenever hashes match, so grouping stays exact.
 class PersonTable {
@@ -1257,15 +1272,13 @@ static int run() {
                 }
             }
             std::vector<uint32_t>().swap(click_person);
+            auto event_less = [](const CompactEvent &a, const CompactEvent &b) { return a.ts < b.ts; };
+            auto click_less = [](const CompactClick &a, const CompactClick &b) {
+                return a.ts != b.ts ? a.ts < b.ts : a.id > b.id;
+            };
             for (size_t p = 0; p < np; ++p) {
-                auto first = events.begin() + event_start[p], last = events.begin() + event_start[p + 1];
-                if (last - first > 1)
-                    std::sort(first, last, [](auto &a, auto &b) { return a.ts < b.ts; });
-                auto cf = clicks.begin() + click_start[p], cl = clicks.begin() + click_start[p + 1];
-                if (cl - cf > 1)
-                    std::sort(cf, cl, [](auto &a, auto &b) {
-                        return a.ts != b.ts ? a.ts < b.ts : a.id > b.id;
-                    });
+                sort_run(events.data() + event_start[p], events.data() + event_start[p + 1], event_less);
+                sort_run(clicks.data() + click_start[p], clicks.data() + click_start[p + 1], click_less);
             }
             auto &rows = user_rows[shard];
             auto &daily = campaign_rows[worker];
