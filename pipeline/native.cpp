@@ -482,7 +482,79 @@ template <size_t N, class F> void rows(SV text, bool header, F f) {
 // One pass over a headerless chunk. Commas, quotes and LFs are located with
 // SSE2 bitmasks; any line that contains a quote is handed to rows<N>, which
 // applies the exact quoting rules. Other lines need exactly N - 1 commas.
+#if defined(__x86_64__)
+#include <immintrin.h>
+// One line at a time with AVX-512: two 64-byte loads from the line start give
+// comma, quote and LF bitmaps. A line must hold exactly N - 1 commas before its
+// LF; each field's quotes must be none, or exactly its first and last byte with
+// at least two bytes (then stripped), checked without branches. Lines of 128
+// bytes or more and the last bytes of the text go to rows(), the reference rules.
+template <size_t N, class F>
+__attribute__((target("avx512bw,avx512f,bmi,bmi2,popcnt"))) void rows_avx512(SV text, F &f) {
+    using U128 = unsigned __int128;
+    const char *p = text.data(), *end = p + text.size();
+    const __m512i comma = _mm512_set1_epi8(','), quote = _mm512_set1_epi8('"'), lf = _mm512_set1_epi8('\n');
+    std::array<SV, N> fields;
+    while (end - p >= 128) {
+        __m512i lo = _mm512_loadu_si512(p), hi = _mm512_loadu_si512(p + 64);
+        uint64_t lf_lo = _mm512_cmpeq_epi8_mask(lo, lf), lf_hi = _mm512_cmpeq_epi8_mask(hi, lf);
+        unsigned length;
+        U128 commas, quotes;
+        if (lf_lo) {
+            length = unsigned(_tzcnt_u64(lf_lo));
+            commas = _bzhi_u64(_mm512_cmpeq_epi8_mask(lo, comma), length);
+            quotes = _bzhi_u64(_mm512_cmpeq_epi8_mask(lo, quote), length);
+        } else if (lf_hi) {
+            unsigned rest = unsigned(_tzcnt_u64(lf_hi));
+            length = 64 + rest;
+            commas = U128(_bzhi_u64(_mm512_cmpeq_epi8_mask(hi, comma), rest)) << 64 |
+                     _mm512_cmpeq_epi8_mask(lo, comma);
+            quotes = U128(_bzhi_u64(_mm512_cmpeq_epi8_mask(hi, quote), rest)) << 64 |
+                     _mm512_cmpeq_epi8_mask(lo, quote);
+        } else {
+            const char *stop = static_cast<const char *>(std::memchr(p, '\n', size_t(end - p)));
+            const char *next = stop ? stop + 1 : end;
+            rows<N>(SV(p, size_t(next - p)), false, f);
+            p = next;
+            continue;
+        }
+        unsigned count = unsigned(_mm_popcnt_u64(uint64_t(commas)) + _mm_popcnt_u64(uint64_t(commas >> 64)));
+        if (count == N - 1) {
+            bool good = true;
+            unsigned start = 0;
+            for (size_t i = 0; i < N; ++i) {
+                unsigned stop = length;
+                if (i + 1 < N) {
+                    uint64_t low = uint64_t(commas);
+                    stop = low ? unsigned(_tzcnt_u64(low)) : 64 + unsigned(_tzcnt_u64(uint64_t(commas >> 64)));
+                    commas &= commas - 1;
+                }
+                unsigned width = stop - start;
+                U128 q = (quotes >> start) & ((U128(1) << width) - 1);
+                bool wrapped = width >= 2 && q == (U128(1) | (U128(1) << (width - 1)));
+                good &= !q | wrapped;
+                fields[i] = SV(p + start + wrapped, width - 2 * wrapped);
+                start = stop + 1;
+            }
+            if (good)
+                f(fields);
+        }
+        p += length + 1;
+    }
+    if (p < end)
+        rows<N>(SV(p, size_t(end - p)), false, f);
+}
+static bool has_avx512() {
+    static const bool yes = __builtin_cpu_supports("avx512bw") && __builtin_cpu_supports("avx512f") &&
+                            __builtin_cpu_supports("bmi2") && __builtin_cpu_supports("popcnt");
+    return yes;
+}
+#endif
 template <size_t N, class F> void fast_rows(SV text, F f) {
+#if defined(__x86_64__)
+    if (has_avx512())
+        return rows_avx512<N>(text, f);
+#endif
     // Generated inputs quote about a fifth of all fields, so most lines hold a
     // quote. rows() validates quotes while it scans, in the same single pass.
     rows<N>(text, false, f);
