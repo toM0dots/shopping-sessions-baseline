@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "source": "Datathon portal UI",
+  "portal_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions",
+  "observed_at_utc": "2026-11-21T23:18:28Z",
+  "submission_id": "BB-517A83A4",
+  "repository_url": "https://github.com/toM0dots/shopping-sessions-baseline",
+  "candidate_commit": "b78971cff5e158c627a0aca31005373db77ebcd5",
+  "commit_display": "b78971cff5e1",
+  "status": "Scored",
+  "runtime_seconds": 0.3082,
+  "runtime_display": "0.3082 s",
+  "target_seconds": 0.3,
+  "target_strictly_below": true,
+  "target_met": false,
+  "selected_for_final": false,
+  "scorer": "shopping-sessions-4",
+  "workload": {
+    "type": "hidden practice input",
+    "approximate_events": 20000000
+  },
+  "portal_configuration": {
+    "pinned_vcpus": 8,
+    "memory_gb_displayed": 24,
+    "swap": "disabled",
+    "timing_scope": "Container start through exit",
+    "aggregation_policy": "Median of three runs when the first run finishes below 20 seconds",
+    "displayed_machine_variability": "Practice times can vary by up to about 20% across scoring machines"
+  },
+  "correctness": {
+    "scorer_accepted": true,
+    "evidence": "Portal reached Scored; detailed correctness results were not exposed"
+  },
+  "individual_runtime_samples_seconds": null,
+  "selected_engine": null,
+  "previous_submission_at_same_observation": {
+    "submission_id": "BB-1408C9EE",
+    "candidate_commit": "fd56b794f7efe74bcb4e8d32bd653f4df923c7fb",
+    "status": "Scored",
+    "runtime_seconds": 0.3082,
+    "runtime_display": "0.3082 s",
+    "final_entry_display": "Entered in the final (your best score)",
+    "earlier_observation": "logs/portal-generator-fastpath.json"
+  },
+  "result": "Tie at the displayed precision; no demonstrated portal improvement and the below-0.3-second target was not reached.",
+  "notes": "The refreshed portal shows four decimal places. The previous report preserves its earlier two-decimal 0.31 s display. The previous final entry was left selected. CI gains of 0.7–1.4% on 20M do not establish a portal gain; the 60M CI median regressed by 0.72%. The portal did not expose per-run timings or engine-selection logs."
+}

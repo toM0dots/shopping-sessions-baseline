@@ -43,7 +43,7 @@ caches were not flushed. The 60M regression limits the improvement to the tested
 20M workloads. These CI results do not establish a portal runtime below 0.30 s.
 
 Ten screening configurations passed output comparison; `XL_BB=14` had the best
-screening median and was selected for the independent holdout comparisons above.
+screening median and was selected for the separate confirmation runs above.
 Inlining purchase parsing was slower and remains disabled, as do direct click
 indexing and batched release. The selected build passed **36 official fixtures**,
 **48 differential checks** against the Python reference (**33 fast, 15 fallback**),
@@ -59,20 +59,29 @@ See the [paired measurements](logs/linux-selected-parser-paired.json),
 [public golden validation](logs/public-selected-parser-validation.json).
 The [release manifest](logs/fast-release-selection.json) pins the measured binary's
 SHA-256 (`696661fb73cd0fc86ea74a7cf132158da99f8924261d4fe5f5eead2b3f09e459`);
-verification of the release build against that binary is pending.
+the release build matched it byte-for-byte and repeated both public golden checks
+in [release CI](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44960642883).
+See [binary verification](logs/fast-release-binary-verification.json) and
+[release golden results](logs/public-bb14-release.json).
 
-The most recent verified portal measurement predates this tuning update.
 On the [Datathon portal](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions),
+submission **`BB-517A83A4`** at
+[`b78971c`](https://github.com/toM0dots/shopping-sessions-baseline/commit/b78971cff5e158c627a0aca31005373db77ebcd5)
+reached **Scored: 0.3082 s**, observed on 2026-11-21 at 23:18:28 UTC.
+**The below-0.30 s target was not reached.** At the same observation, the previous
 submission **`BB-1408C9EE`** at
 [`fd56b794`](https://github.com/toM0dots/shopping-sessions-baseline/commit/fd56b794f7efe74bcb4e8d32bd653f4df923c7fb)
-reached **Scored: 0.31 s** on the hidden practice input and was marked
-**Entered in the final (your best score)**, observed on 2026-11-21 at 21:32:58 UTC.
+also displayed **0.3082 s** and remained **Entered in the final (your best score)**.
+This is a tie at the displayed precision, with no demonstrated portal improvement.
+The portal now shows four decimal places; the earlier report preserves its original
+two-decimal **0.31 s** observation. The final entry was left unchanged.
 The portal's `shopping-sessions-4` scorer uses about 20M events, eight pinned vCPUs,
 24 GB RAM and no swap; its policy reports the median of three runs when the first
-finishes below 20 seconds. The earlier submission `BB-4EC0915E` at `1e2e1695b224`
-scored **1.37 s**. The portal accepted the corrected submission, but did not expose
+finishes below 20 seconds. It warns that practice times can vary by about 20%
+across scoring machines. The portal accepted the new submission, but did not expose
 individual timings, detailed correctness results or engine-selection logs.
-See [`logs/portal-generator-fastpath.json`](logs/portal-generator-fastpath.json).
+See [the new portal result](logs/portal-bb14.json) and
+[the earlier observation](logs/portal-generator-fastpath.json).
 
 The original fast-engine comparison used source [`98d5116`](https://github.com/toM0dots/shopping-sessions-baseline/commit/98d51161f0cfbcd6364e3ae513e6a00fbf2ec77d).
 On an Intel Xeon 6975P-C Linux runner, with **four pinned logical CPUs, 12 GiB and no
@@ -87,9 +96,9 @@ swap**, alternating fresh-container runs produced these medians:
 These measure Docker container start through exit, including CSV reads, computation
 and Parquet writing. Both engines run from the same immutable image; the baseline
 selects the unchanged C++ engine. This is approximately a **4.9x speedup at 20M** and
-**5.5x at 60M** in CI. These four-CPU measurements are separate from the **0.31 s
+**5.5x at 60M** in CI. These four-CPU measurements are separate from the **0.3082 s
 portal result** above, which uses eight vCPUs and different inputs/hardware.
-**0.30 s remains the portal target.**
+**Below 0.30 s remains the portal target.**
 
 Both complete output tables matched exactly, with no duplicate keys, in **all 11
 pairs**. The 60M comparison includes 6,601,416 user-day rows and 28,014 campaign-day
@@ -149,7 +158,7 @@ found **no consistent improvement on either 20M input**. Seven experiments, incl
 a diagnostic profile, retained all **56 alternating container pairs** on an AMD EPYC
 9V45 with four pinned logical CPUs spanning two physical cores, 12 GiB and no swap.
 Both complete output tables matched in every pair. These are separate CI measurements;
-the verified portal result remains **0.31 s at `fd56b794`**.
+the latest portal comparison is recorded above.
 
 - Core-first CPU placement was essentially unchanged: **0.25818 → 0.25816 s** and
   **0.25240 → 0.25134 s** for the two 20M seeds.

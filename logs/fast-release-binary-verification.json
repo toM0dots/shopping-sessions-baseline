@@ -1,0 +1,12 @@
+{
+  "fast_binary_sha256": "696661fb73cd0fc86ea74a7cf132158da99f8924261d4fe5f5eead2b3f09e459",
+  "expected_fast_binary_sha256": "696661fb73cd0fc86ea74a7cf132158da99f8924261d4fe5f5eead2b3f09e459",
+  "exact_binary_match": true,
+  "all_source_hashes_match": true,
+  "compile_settings": {
+    "XL_BB": "14"
+  },
+  "runtime_settings": {},
+  "release_commit": "b78971cff5e158c627a0aca31005373db77ebcd5",
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44960642883"
+}
