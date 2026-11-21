@@ -23,5 +23,6 @@ if(PGO STREQUAL "generate")
   target_compile_options(shopping-sessions PRIVATE -fprofile-generate -fprofile-update=atomic)
   target_link_options(shopping-sessions PRIVATE -fprofile-generate)
 elseif(PGO STREQUAL "use")
-  target_compile_options(shopping-sessions PRIVATE -fprofile-use -fprofile-correction -Wno-missing-profile)
+  target_compile_options(shopping-sessions PRIVATE -fprofile-use -fprofile-correction -Wno-missing-profile
+                         -Wno-error=coverage-mismatch)
 endif()
