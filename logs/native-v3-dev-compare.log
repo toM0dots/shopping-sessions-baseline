@@ -1,0 +1,5 @@
+setup=0.1219 parse_events=0.199002 dedup_events=0.0755506 clicks=0.0559444 sessionize_aggregate=0.0718928 write_parquet=0.0585656
+{"user_rows":117038,"campaign_rows":27400,"sessions":179366,"events":977930,"revenue_cents":376461330,"elapsed_seconds":0.583442}
+user_daily: rows 117038 vs 117038; only in A 0; only in B 0; duplicate keys 0 vs 0
+campaign_daily: rows 27400 vs 27400; only in A 0; only in B 0; duplicate keys 0 vs 0
+MATCH

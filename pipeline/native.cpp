@@ -8,6 +8,9 @@
 #include <chrono>
 #include <cstring>
 #include <fcntl.h>
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -138,6 +141,73 @@ struct Inputs {
 };
 
 template <size_t N, class F> void rows(SV text, bool header, F f) {
+#if defined(__SSE2__)
+    if (header) {
+        auto p = text.find('\n');
+        if (p == SV::npos)
+            return;
+        text.remove_prefix(p + 1);
+    }
+    if (text.empty())
+        return;
+    // Scan commas, quotes and LF together. Count quotes while scanning, so a
+    // valid quoted field never needs a second pass over its interior. Only LF
+    // ends a row; CR, spaces and non-ASCII bytes remain ordinary field data.
+    std::array<SV, N> fields;
+    const char *field = text.data(), *cursor = field, *end = field + text.size();
+    size_t count = 0, quotes = 0;
+    bool good = true;
+    auto special = [&](const char *position, char c) {
+        if (c == '"') {
+            ++quotes;
+            return;
+        }
+        if (count < N) {
+            SV value(field, size_t(position - field));
+            if (quotes) {
+                if (quotes != 2 || value.size() < 2 || value.front() != '"' || value.back() != '"')
+                    good = false;
+                else {
+                    value.remove_prefix(1);
+                    value.remove_suffix(1);
+                }
+            }
+            fields[count++] = value;
+        } else
+            good = false;
+        quotes = 0;
+        // A synthetic terminator handles a final row without LF. Do not form a
+        // pointer beyond the one-past-end position of the mapped input.
+        field = c ? position + 1 : position;
+        if (c != ',') {
+            if (good && count == N)
+                f(fields);
+            good = true;
+            count = 0;
+        }
+    };
+    const __m128i comma = _mm_set1_epi8(','), quote = _mm_set1_epi8('"'), lf = _mm_set1_epi8('\n');
+    while (size_t(end - cursor) >= 16) {
+        __m128i bytes = _mm_loadu_si128(reinterpret_cast<const __m128i *>(cursor));
+        unsigned mask = unsigned(_mm_movemask_epi8(_mm_or_si128(
+            _mm_or_si128(_mm_cmpeq_epi8(bytes, comma), _mm_cmpeq_epi8(bytes, quote)),
+            _mm_cmpeq_epi8(bytes, lf))));
+        while (mask) {
+            unsigned at = unsigned(__builtin_ctz(mask));
+            special(cursor + at, cursor[at]);
+            mask &= mask - 1;
+        }
+        cursor += 16;
+    }
+    while (cursor != end) {
+        char c = *cursor;
+        if (c == ',' || c == '"' || c == '\n')
+            special(cursor, c);
+        ++cursor;
+    }
+    if (field != end || count)
+        special(end, '\0');
+#else
     if (header) {
         auto p = text.find('\n');
         if (p == SV::npos)
@@ -179,6 +249,7 @@ template <size_t N, class F> void rows(SV text, bool header, F f) {
         if (good)
             f(fields);
     }
+#endif
 }
 static I64 days_from_civil(int y, unsigned m, unsigned d) {
     y -= m <= 2;
@@ -190,22 +261,24 @@ static I64 days_from_civil(int y, unsigned m, unsigned d) {
 static I64 timestamp(SV s) {
     if (s.empty())
         return BAD;
-    if (s.size() != 20 && s.size() != 25) {
+    if ((s.size() != 20 && s.size() != 25) || s[4] != '-') {
         I64 n = 0;
-        for (unsigned char c : s) {
-            if (c < '0' || c > '9' || n > (std::numeric_limits<I64>::max() - (c - '0')) / 10)
-                return BAD;
-            n = n * 10 + c - '0';
-        }
-        return n;
-    }
-    // A 20/25-character all-digit timestamp can have arbitrarily many zeroes.
-    if (s[4] != '-') {
-        I64 n = 0;
-        for (unsigned char c : s) {
-            if (c < '0' || c > '9' || n > (std::numeric_limits<I64>::max() - (c - '0')) / 10)
-                return BAD;
-            n = n * 10 + c - '0';
+        // Up to 18 decimal digits cannot overflow int64_t. The slower path
+        // retains arbitrary leading zeroes and checked 19+ digit conversion.
+        if (s.size() <= 18) {
+            for (unsigned char c : s) {
+                unsigned digit = unsigned(c) - '0';
+                if (digit > 9)
+                    return BAD;
+                n = n * 10 + digit;
+            }
+        } else {
+            for (unsigned char c : s) {
+                unsigned digit = unsigned(c) - '0';
+                if (digit > 9 || n > (std::numeric_limits<I64>::max() - digit) / 10)
+                    return BAD;
+                n = n * 10 + digit;
+            }
         }
         return n;
     }
@@ -214,22 +287,44 @@ static I64 timestamp(SV s) {
     auto number = [&](int at, int count) {
         int n = 0;
         for (int i = 0; i < count; ++i) {
-            unsigned char c = s[at + i];
-            if (c < '0' || c > '9')
+            unsigned digit = unsigned(static_cast<unsigned char>(s[at + i])) - '0';
+            if (digit > 9)
                 return -1;
-            n = n * 10 + c - '0';
+            n = n * 10 + digit;
         }
         return n;
     };
-    int y = number(0, 4), m = number(5, 2), d = number(8, 2), h = number(11, 2), mi = number(14, 2),
-        sec = number(17, 2);
-    static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    if (y < 1 || m < 1 || m > 12 || d < 1 || h < 0 || h > 23 || mi < 0 || mi > 59 || sec < 0 ||
-        sec > 59)
+    // Many timestamps share a date. Cache only fully validated YYYY-MM-DD
+    // prefixes, comparing all ten bytes before reusing the civil-date result.
+    // The cache belongs to this worker thread and never survives a process.
+    struct DateEntry {
+        uint64_t prefix = 0;
+        uint16_t suffix = 0;
+        I64 midnight = BAD;
+    };
+    static thread_local std::array<DateEntry, 32> dates;
+    uint64_t prefix;
+    uint16_t suffix;
+    std::memcpy(&prefix, s.data(), sizeof(prefix));
+    std::memcpy(&suffix, s.data() + 8, sizeof(suffix));
+    auto &entry = dates[(unsigned(static_cast<unsigned char>(s[8])) * 10 +
+                         unsigned(static_cast<unsigned char>(s[9]))) & 31];
+    I64 midnight;
+    if (entry.prefix == prefix && entry.suffix == suffix && entry.midnight != BAD)
+        midnight = entry.midnight;
+    else {
+        int y = number(0, 4), m = number(5, 2), d = number(8, 2);
+        static const int md[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        if (y < 1 || m < 1 || m > 12 || d < 1 ||
+            d > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
+            return BAD;
+        midnight = days_from_civil(y, m, d) * DAY;
+        entry = {prefix, suffix, midnight};
+    }
+    int h = number(11, 2), mi = number(14, 2), sec = number(17, 2);
+    if (h < 0 || h > 23 || mi < 0 || mi > 59 || sec < 0 || sec > 59)
         return BAD;
-    if (d > md[m] + (m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)))
-        return BAD;
-    I64 t = days_from_civil(y, m, d) * DAY + (h * 3600 + mi * 60 + sec) * 1000LL;
+    I64 t = midnight + (h * 3600 + mi * 60 + sec) * 1000LL;
     if (s.size() == 20)
         return s[19] == 'Z' ? t : BAD;
     if ((s[19] != '+' && s[19] != '-') || s[22] != ':')
@@ -255,55 +350,90 @@ static I64 floor_day(I64 t) {
     return d - (t % DAY < 0);
 }
 
-// Once linking is finished, all identity queries are read-only. A contiguous
-// lookup avoids unordered_map node chasing on every event and click.
-class PersonLookup {
+// A contiguous string-to-ID map is mutable while links are joined, then serves
+// read-only identity queries without rebuilding the table. Input-backed keys
+// stay valid for the entire run. Empty keys are excluded by the CSV rules.
+class StringIds {
     struct Entry {
         SV key;
-        uint32_t person = 0, tag = 0;
+        uint32_t value = 0, tag = 0;
     };
     std::vector<Entry> entries;
+    size_t count = 0;
+
+    void grow(size_t capacity) {
+        std::vector<Entry> next(capacity);
+        for (const auto &entry : entries) {
+            if (entry.key.empty())
+                continue;
+            size_t at = Hash{}(entry.key) & (capacity - 1);
+            while (!next[at].key.empty())
+                at = (at + 1) & (capacity - 1);
+            next[at] = entry;
+        }
+        entries.swap(next);
+    }
 
   public:
-    explicit PersonLookup(size_t count) {
-        size_t capacity = 8;
-        while (capacity * 7 / 10 < count)
+    explicit StringIds(size_t expected = 0) { reserve(expected); }
+    void reserve(size_t expected) {
+        size_t capacity = std::max<size_t>(8, entries.size());
+        while (capacity * 7 / 10 < expected)
             capacity *= 2;
-        entries.resize(capacity);
+        if (capacity != entries.size())
+            grow(capacity);
     }
-    void insert(SV key, uint32_t person) {
+    size_t size() const { return count; }
+    std::pair<uint32_t *, bool> emplace(SV key, uint32_t value) {
         uint64_t hash = Hash{}(key);
+        uint32_t tag = uint32_t(hash >> 32);
         size_t at = hash & (entries.size() - 1);
-        while (!entries[at].key.empty())
+        while (!entries[at].key.empty()) {
+            auto &entry = entries[at];
+            if (entry.tag == tag && entry.key == key)
+                return {&entry.value, false};
             at = (at + 1) & (entries.size() - 1);
-        entries[at] = {key, person, uint32_t(hash >> 32)};
+        }
+        if (count + 1 > entries.size() * 7 / 10) {
+            grow(entries.size() * 2);
+            at = hash & (entries.size() - 1);
+            while (!entries[at].key.empty())
+                at = (at + 1) & (entries.size() - 1);
+        }
+        entries[at] = {key, value, tag};
+        ++count;
+        return {&entries[at].value, true};
     }
     const uint32_t *find(SV key) const {
         uint64_t hash = Hash{}(key);
         size_t at = hash & (entries.size() - 1);
         while (!entries[at].key.empty()) {
-            auto &entry = entries[at];
+            const auto &entry = entries[at];
             if (entry.tag == uint32_t(hash >> 32) && entry.key == key)
-                return &entry.person;
+                return &entry.value;
             at = (at + 1) & (entries.size() - 1);
         }
         return nullptr;
     }
+    template <class F> void each(F f) {
+        for (auto &entry : entries)
+            if (!entry.key.empty())
+                f(entry.key, entry.value);
+    }
 };
 
 struct People {
-    Map<uint32_t> ids;
+    StringIds ids;
     std::vector<uint32_t> parent, size;
     std::vector<SV> names;
-    std::unique_ptr<PersonLookup> lookup;
     uint32_t id(SV s) {
-        auto [it, new_id] = ids.emplace(s, parent.size());
+        auto [value, new_id] = ids.emplace(s, parent.size());
         if (new_id) {
-            parent.push_back(it->second);
+            parent.push_back(*value);
             size.push_back(1);
             names.push_back(s);
         }
-        return it->second;
+        return *value;
     }
     uint32_t find(uint32_t i) {
         while (parent[i] != i) {
@@ -323,17 +453,14 @@ struct People {
         names[x] = std::min(names[x], names[y]);
     }
     void freeze() {
-        lookup = std::make_unique<PersonLookup>(ids.size());
-        for (auto &[key, i] : ids)
-            lookup->insert(key, find(i));
-        // These mutable structures are no longer needed. Ordinary destruction
-        // is retained; its cost is included in end-to-end process timing.
-        Map<uint32_t>().swap(ids);
+        // Finalize values in place. No key hashing, node destruction or second
+        // table allocation is needed; only union-find storage is released.
+        ids.each([&](SV, uint32_t &i) { i = find(i); });
         std::vector<uint32_t>().swap(parent);
         std::vector<uint32_t>().swap(size);
     }
     SV person(SV s) const {
-        auto person = lookup->find(s);
+        auto person = ids.find(s);
         return person ? names[*person] : s;
     }
 };
@@ -409,6 +536,35 @@ struct CompactClick {
     I64 ts;
     uint32_t person, campaign;
 };
+// Dense person IDs let us group in linear time, then sort only within each
+// person's range. This avoids comparing unrelated people at every sort level.
+// A shared-device person can still contain arbitrarily many rows: its complete
+// range goes through the same comparison sort, without a per-person size cap.
+template <class T, class Less>
+static void sort_by_person(std::vector<T> &rows, size_t people, Less less) {
+    if (rows.empty())
+        return;
+    std::vector<size_t> starts(people);
+    for (const auto &row : rows)
+        ++starts[row.person];
+    size_t end = 0;
+    for (auto &count : starts) {
+        end += count;
+        count = end;
+    }
+    std::vector<T> grouped(rows.size());
+    // Each cursor begins at its group's end and finishes at its start. Equal
+    // event timestamps are interchangeable, and click ties are sorted by ID.
+    for (const auto &row : rows)
+        grouped[--starts[row.person]] = row;
+    for (size_t person = 0; person < people; ++person) {
+        size_t begin = starts[person];
+        size_t finish = person + 1 < people ? starts[person + 1] : grouped.size();
+        if (finish - begin > 1)
+            std::sort(grouped.begin() + begin, grouped.begin() + finish, less);
+    }
+    rows.swap(grouped);
+}
 template <class T> using Partitions = std::array<std::vector<T>, SHARDS>;
 struct UserRow {
     SV person;
@@ -705,8 +861,7 @@ static int run() {
             }
             events.reserve(ne);
             clicks.reserve(nc);
-            Map<uint32_t> person_ids;
-            person_ids.reserve(ne / 16 + 1);
+            StringIds person_ids(ne / 16 + 1);
             std::vector<SV> person_names;
             for (size_t s = 0; s < SHARDS; ++s) {
                 auto &ev = event_parts[s][shard];
@@ -714,7 +869,7 @@ static int run() {
                     auto [it, added] = person_ids.emplace(e.person, person_names.size());
                     if (added)
                         person_names.push_back(e.person);
-                    events.push_back({e.ts, it->second, e.cents, e.category});
+                    events.push_back({e.ts, *it, e.cents, e.category});
                 }
                 std::vector<Event>().swap(ev);
             }
@@ -722,17 +877,16 @@ static int run() {
                 auto &cl = click_parts[s][shard];
                 for (auto &c : cl) {
                     auto it = person_ids.find(c.person);
-                    if (it != person_ids.end())
-                        clicks.push_back({c.id, c.ts, it->second, c.campaign});
+                    if (it)
+                        clicks.push_back({c.id, c.ts, *it, c.campaign});
                 }
                 std::vector<Click>().swap(cl);
             }
-            std::sort(events.begin(), events.end(), [](auto &a, auto &b) {
-                return a.person != b.person ? a.person < b.person : a.ts < b.ts;
+            sort_by_person(events, person_names.size(), [](auto &a, auto &b) {
+                return a.ts < b.ts;
             });
-            std::sort(clicks.begin(), clicks.end(), [](auto &a, auto &b) {
-                return a.person != b.person ? a.person < b.person
-                                            : (a.ts != b.ts ? a.ts < b.ts : a.id > b.id);
+            sort_by_person(clicks, person_names.size(), [](auto &a, auto &b) {
+                return a.ts != b.ts ? a.ts < b.ts : a.id > b.id;
             });
             auto &rows = user_rows[shard];
             auto &daily = campaign_rows[worker];
