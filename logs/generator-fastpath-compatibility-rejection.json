@@ -1,0 +1,65 @@
+{
+  "candidate_commit": "1e2e1695b22429ac8405206b9ee7881a4b745eee",
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44948915242",
+  "status": "rejected_by_mode_check",
+  "reason": "RuntimeError: seed=41 normal threads=1: expected fast, got baseline",
+  "host_cpu": "AMD EPYC 9V45 96-Core Processor",
+  "finding": "This VM exposes the required AVX-512 instructions, but not PKU/OSPKE. The overly broad CPU gate chose the C++ engine. The exact output comparison passed, but the harness rejected this as fast-path coverage.",
+  "action": "Disable PKU in the Rust compilation feature contract and remove only PKU/OSPKE from dispatch requirements, then rerun validation and benchmarks.",
+  "validation": {
+    "schema_version": 1,
+    "success": false,
+    "mode_checks": "strict",
+    "seeds": [
+      41,
+      73
+    ],
+    "events_requested": 100000,
+    "threads": [
+      1,
+      4,
+      8
+    ],
+    "candidate": [
+      "build/fastpath-ci/bin/shopping-sessions-dispatch"
+    ],
+    "baseline": [
+      "build/fastpath-ci/bin/shopping-sessions"
+    ],
+    "reference": [
+      "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/.venv/bin/python",
+      "/home/runner/work/shopping-sessions-baseline/shopping-sessions-baseline/pipeline/pipeline.py"
+    ],
+    "work_dir": "/tmp/generator-fastpath-2xw5r9vd",
+    "cases": [
+      {
+        "seed": 41,
+        "name": "normal",
+        "mutation": {},
+        "runs": [
+          {
+            "threads": 1,
+            "exit_code": 0,
+            "mode": "baseline",
+            "elapsed_seconds_diagnostic_only": 0.07691471900000124,
+            "stderr": "[engine] baseline\nsetup=0.00862185 parse=0.00879908 dedup_events=0.00111185 resolve=0.0320834 sessionize_aggregate=0.0132661 write_parquet=0.00447737 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0683978}\n",
+            "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+          }
+        ],
+        "baseline": {
+          "exit_code": 0,
+          "mode": "unknown",
+          "elapsed_seconds_diagnostic_only": 0.07917294600002833,
+          "stderr": "setup=0.00923788 parse=0.00868687 dedup_events=0.00109684 resolve=0.032561 sessionize_aggregate=0.0139066 write_parquet=0.00465919 \n{\"user_rows\":12945,\"campaign_rows\":13753,\"sessions\":20346,\"events\":97490,\"revenue_cents\":42557615,\"elapsed_seconds\":0.0701975}\n",
+          "comparison": "user_daily: rows 12945 vs 12945; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 13753 vs 13753; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      }
+    ],
+    "error": "RuntimeError: seed=41 normal threads=1: expected fast, got baseline",
+    "run_count": 1,
+    "mode_counts": {
+      "baseline": 1
+    }
+  }
+}
+

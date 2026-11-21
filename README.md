@@ -25,8 +25,72 @@ CPU. `SS_ENGINE_TRACE=1` reports selection and any fallback on stderr. Build wit
 `docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .`; native macOS builds
 continue to use C++.
 
-Validation and paired benchmark results for this integration are pending. Upstream
-scores do not measure this revision, and 0.30 seconds is a target, not a measured result.
+The verified production source is [`98d5116`](https://github.com/toM0dots/shopping-sessions-baseline/commit/98d51161f0cfbcd6364e3ae513e6a00fbf2ec77d).
+On an Intel Xeon 6975P-C Linux runner, with **four pinned logical CPUs, 12 GiB and no
+swap**, alternating fresh-container runs produced these medians:
+
+| Official generated input | Pairs | C++ baseline | Fast engine | Runtime reduction |
+| --- | ---: | ---: | ---: | ---: |
+| 20M events / 5M clicks, seed 17 | 5 | 1.697 s | **0.347 s** | **79.6%** |
+| 20M events / 5M clicks, seed 8675309 | 3 | 1.689 s | **0.345 s** | **79.6%** |
+| 60M events / 15M clicks, seed 948307 | 3 | 4.977 s | **0.903 s** | **81.9%** |
+
+These measure Docker container start through exit, including CSV reads, computation
+and Parquet writing. Both engines run from the same immutable image; the baseline
+selects the unchanged C++ engine. This is approximately a **4.9x speedup at 20M** and
+**5.5x at 60M**, not a measured portal score. The portal uses eight vCPUs and different
+inputs/hardware. **0.30 s remains the portal target; it has not been verified here.**
+
+Both complete output tables matched exactly, with no duplicate keys, in **all 11
+pairs**. The 60M comparison includes 6,601,416 user-day rows and 28,014 campaign-day
+rows. Every timed candidate finished on the fast path. Caches were not flushed and
+no samples were discarded. The report also retains outer Docker-management times,
+including first-baseline outliers; those are a different timing scope. Peak RSS was
+not measured. Raw samples, limits, immutable image ID and complete comparison results:
+[`logs/linux-generator-fastpath.json`](logs/linux-generator-fastpath.json).
+[Successful full build, validation and benchmark](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44949538888).
+
+Additional validation:
+
+- **36/36 official fixtures** in the isolated production container; existing CSV/key
+  sanitizer checks and the new partial-output cleanup test passed.
+- **39 differential runs** on two generated holdout seeds and mutations, at one,
+  four and eight threads, against the independent Python reference. Of these, 24
+  completed on the fast path and 15 exercised full C++ fallback. Cases include
+  shuffled rows, long/mixed/opaque IDs, permuted event IDs, cross-person links,
+  invalid earliest duplicate winners, unusual timestamps, large catalogs, wide
+  windows, and removal of seeded stale output parts. See
+  [`logs/generator-fastpath-validation.json`](logs/generator-fastpath-validation.json).
+- **Official public 1M golden answer**, with both published CSV hashes pinned:
+  all 117,038 user rows and 27,400 campaign rows matched at one and eight threads,
+  with fast execution required. See
+  [`logs/public-generator-fastpath.json`](logs/public-generator-fastpath.json) and
+  [the public-answer CI run](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44949923318).
+  This check's commit changes tests only; its production engine is identical to
+  the benchmarked source.
+
+An intermediate AMD CI run caught an overly conservative CPU gate: it selected C++
+because the VM omitted PKU/OSPKE. Its output matched, but the required-fast check
+correctly rejected the run. The build now explicitly disables unused PKU and the
+dispatcher checks the matching feature contract. The rejection and initial Intel
+measurements remain in `logs/*generator-fastpath*`; they are not substituted for
+the successful final measurements above.
+
+Reproduce the differential and large-data checks on a supported Linux Docker host:
+
+```sh
+docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .
+python scripts/benchmark_fastpath.py --prepare-only
+python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
+  --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \
+  --baseline build/fastpath-ci/bin/shopping-sessions --report logs/generator-fastpath-validation.json
+python scripts/check_public_fastpath.py build/fastpath-ci/generator-target/release/generate \
+  --candidate build/fastpath-ci/bin/shopping-sessions-dispatch --report logs/public-generator-fastpath.json
+python scripts/benchmark_fastpath.py --generator build/fastpath-ci/generator-target/release/generate
+```
+
+Install `requirements-dev.txt` and Rust/Cargo for the verification tools. The container
+itself does not use Python or build anything during its timed execution.
 
 ## Previous update: measured against the latest merged code (v8)
 
@@ -250,15 +314,16 @@ Validation of this update:
 - The public 1M answer, the hidden portal input and the 60M workload were not available
   for this update.
 
-## Runtime and measurement context
+## Historical v3 measurements and timing context
 
 The [portal practice workload](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions)
 uses **about 20M hidden events, 8 vCPUs and 24 GB RAM**, timed from container start
 through exit. Its final workload is about 60M events. The public 1M input is a
-smaller correctness check. The last reported **7.3-second portal result is not a
-measurement of this revision**; a new portal run is still needed.
+smaller correctness check. The historical **7.3-second portal result came from
+an earlier revision**. The generator-aware engine's current measurements are at
+the top of this document; no portal score is claimed for that engine.
 
-The latest **Linux container comparison** against `a7cd5c1` measured
+The v3 **Linux container comparison** against `a7cd5c1` measured
 **7.285 → 5.993 s median on generated 20M events / 5M clicks: 17.7% lower runtime**.
 The candidate was faster in all six alternating pairs, and both complete output
 tables matched in every pair. This ran on a GitHub Linux runner with **4 vCPUs
@@ -271,7 +336,7 @@ in `logs/linux-v3-final-20m.json`; the
 [successful workflow](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821)
 also verifies the Linux build, sanitizer checks and all 36 fixtures.
 
-The latest local comparisons use the immediately previous published version,
+The v3 local comparisons used its immediately previous published version,
 `a7cd5c1`, as baseline. Each round alternates execution order and compares both
 complete output tables after timing:
 
@@ -400,7 +465,7 @@ generator/target/release/generate --seed 1 --events 1000000 \
   --clicks 250000 --threads 4 --output dev
 python scripts/check_generated.py generator/target/release/generate
 python scripts/fuzz_reference.py 150 -- sh run.sh
-# Surrogate inputs used for the latest update (not the official generator):
+# Surrogate inputs used for the historical v3 update (not the official generator):
 c++ -O2 -pthread -std=c++17 scripts/surrogate_gen.cpp -o build/surrogate_gen
 LINK_STYLE=anon build/surrogate_gen dev-tools/surrogate/s1m 1000000 250000 4 1
 LINK_STYLE=anon build/surrogate_gen dev-tools/surrogate/s20m 20000000 5000000 4 17

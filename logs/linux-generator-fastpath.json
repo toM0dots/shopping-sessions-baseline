@@ -1,0 +1,738 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+  "candidate_commit": "98d51161f0cfbcd6364e3ae513e6a00fbf2ec77d",
+  "baseline_source_commit": "c0bcee19170616f31e54656a65466e37aca8255d",
+  "upstream_fastpath_commit": "92cf41220f5f8ee6d94822a43293699ba1286604",
+  "image": {
+    "reference": "shopping-sessions:ci",
+    "id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+    "os": "linux",
+    "architecture": "amd64",
+    "repo_digests": []
+  },
+  "generator_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions/files/generator.zip",
+  "generator_sha256": "13724cadbac5a99d847e27cea911cd2e338ff972b46c2039da87452011bb101e",
+  "host_cpu_models": [
+    "Intel(R) Xeon(R) 6975P-C"
+  ],
+  "host_available_cpus": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "host_memory_bytes": 16464297984,
+  "container_cpus": 4,
+  "container_cpuset": "0,1,2,3",
+  "container_memory": "12g",
+  "container_swap": "disabled",
+  "method": "Same immutable image; SS_ENGINE=baseline versus SS_ENGINE=fast; alternating AB/BA pairs; fresh containers and output directories; no discarded samples; caches not flushed",
+  "timing_scope": {
+    "container_seconds": "Docker FinishedAt minus StartedAt; includes startup and exit, excludes Docker create/client/inspection/removal. Daemon wall-clock timestamps; not the portal timer.",
+    "wall_seconds": "Host monotonic timer around output setup, Docker create/start/inspect/remove, permission cleanup, and scratch deletion; excludes output comparison."
+  },
+  "notes": "Generated-data CI comparison, not a hidden-data portal score. Baseline C++ source/build inputs match the stated commit; both engines share the new image and dispatcher. Peak RSS is not measured.",
+  "cases": [
+    {
+      "seed": 17,
+      "events": 20000000,
+      "clicks": 5000000,
+      "rounds": 5,
+      "input_csv_bytes": 1921192469,
+      "runs": [
+        {
+          "wall_seconds": 8.648019838999971,
+          "container_seconds": 1.800298774,
+          "container_started_at": "2026-11-21T21:10:43.992005697Z",
+          "container_finished_at": "2026-11-21T21:10:45.792304471Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.104556 parse=0.707052 dedup_events=0.130732 resolve=0.293516 sessionize_aggregate=0.34048 write_parquet=0.0958914 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.6778}",
+          "round": 1,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5108219539999936,
+          "container_seconds": 0.344280894,
+          "container_started_at": "2026-11-21T21:10:45.973459056Z",
+          "container_finished_at": "2026-11-21T21:10:46.31773995Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.5179038670000864,
+          "container_seconds": 0.349576681,
+          "container_started_at": "2026-11-21T21:10:47.510811794Z",
+          "container_finished_at": "2026-11-21T21:10:47.860388475Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 1.8612391479999815,
+          "container_seconds": 1.683467893,
+          "container_started_at": "2026-11-21T21:10:48.026626257Z",
+          "container_finished_at": "2026-11-21T21:10:49.71009415Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.105103 parse=0.70254 dedup_events=0.130821 resolve=0.247975 sessionize_aggregate=0.270045 write_parquet=0.0933249 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.55539}",
+          "round": 2,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 1.8745052320000468,
+          "container_seconds": 1.697429537,
+          "container_started_at": "2026-11-21T21:10:50.89977085Z",
+          "container_finished_at": "2026-11-21T21:10:52.597200387Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.105722 parse=0.70708 dedup_events=0.131614 resolve=0.251834 sessionize_aggregate=0.276216 write_parquet=0.093156 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.57113}",
+          "round": 3,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5094223629999988,
+          "container_seconds": 0.347028243,
+          "container_started_at": "2026-11-21T21:10:52.770974645Z",
+          "container_finished_at": "2026-11-21T21:10:53.118002888Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.5241548140000987,
+          "container_seconds": 0.344403671,
+          "container_started_at": "2026-11-21T21:10:54.280023192Z",
+          "container_finished_at": "2026-11-21T21:10:54.624426863Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 4,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 1.8768060319999904,
+          "container_seconds": 1.699188883,
+          "container_started_at": "2026-11-21T21:10:54.802410924Z",
+          "container_finished_at": "2026-11-21T21:10:56.501599807Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.104585 parse=0.706641 dedup_events=0.131852 resolve=0.262867 sessionize_aggregate=0.270129 write_parquet=0.0954706 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.57708}",
+          "round": 4,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 1.8618587270000262,
+          "container_seconds": 1.691742091,
+          "container_started_at": "2026-11-21T21:10:57.688071898Z",
+          "container_finished_at": "2026-11-21T21:10:59.379813989Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.105464 parse=0.718109 dedup_events=0.12976 resolve=0.246691 sessionize_aggregate=0.273379 write_parquet=0.0952532 \n{\"user_rows\":2249563,\"campaign_rows\":28014,\"sessions\":3416486,\"events\":19674814,\"revenue_cents\":6029421427,\"elapsed_seconds\":1.5742}",
+          "round": 5,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5145721310000226,
+          "container_seconds": 0.348147354,
+          "container_started_at": "2026-11-21T21:10:59.546345667Z",
+          "container_finished_at": "2026-11-21T21:10:59.894493021Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 5,
+          "implementation": "candidate"
+        }
+      ],
+      "comparisons": [
+        {
+          "round": 1,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 2,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 3,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 4,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 5,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2249563 vs 2249563; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "container_seconds": {
+            "min": 1.683467893,
+            "median": 1.697429537,
+            "max": 1.800298774
+          },
+          "wall_seconds": {
+            "min": 1.8612391479999815,
+            "median": 1.8745052320000468,
+            "max": 8.648019838999971
+          }
+        },
+        "candidate": {
+          "container_seconds": {
+            "min": 0.344280894,
+            "median": 0.347028243,
+            "max": 0.349576681
+          },
+          "wall_seconds": {
+            "min": 0.5094223629999988,
+            "median": 0.5145721310000226,
+            "max": 0.5241548140000987
+          }
+        }
+      },
+      "correctness": "Both complete tables match in all 5 pairs"
+    },
+    {
+      "seed": 8675309,
+      "events": 20000000,
+      "clicks": 5000000,
+      "rounds": 3,
+      "input_csv_bytes": 1898618584,
+      "runs": [
+        {
+          "wall_seconds": 8.780522463000011,
+          "container_seconds": 1.693717927,
+          "container_started_at": "2026-11-21T21:11:13.3192508Z",
+          "container_finished_at": "2026-11-21T21:11:15.012968727Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.109638 parse=0.718523 dedup_events=0.120921 resolve=0.246939 sessionize_aggregate=0.275121 write_parquet=0.0939699 \n{\"user_rows\":2231608,\"campaign_rows\":28014,\"sessions\":3377154,\"events\":19625650,\"revenue_cents\":6675779950,\"elapsed_seconds\":1.5705}",
+          "round": 1,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.5071628440000495,
+          "container_seconds": 0.33842693,
+          "container_started_at": "2026-11-21T21:11:15.18389506Z",
+          "container_finished_at": "2026-11-21T21:11:15.52232199Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 0.514978109000026,
+          "container_seconds": 0.345202901,
+          "container_started_at": "2026-11-21T21:11:16.71787377Z",
+          "container_finished_at": "2026-11-21T21:11:17.063076671Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 1.863233148000063,
+          "container_seconds": 1.689036845,
+          "container_started_at": "2026-11-21T21:11:17.228345958Z",
+          "container_finished_at": "2026-11-21T21:11:18.917382803Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.104567 parse=0.706995 dedup_events=0.125579 resolve=0.246216 sessionize_aggregate=0.27292 write_parquet=0.0939821 \n{\"user_rows\":2231608,\"campaign_rows\":28014,\"sessions\":3377154,\"events\":19625650,\"revenue_cents\":6675779950,\"elapsed_seconds\":1.5557}",
+          "round": 2,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 1.8365832570000293,
+          "container_seconds": 1.669954684,
+          "container_started_at": "2026-11-21T21:11:20.091628334Z",
+          "container_finished_at": "2026-11-21T21:11:21.761583018Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.10403 parse=0.704979 dedup_events=0.123394 resolve=0.245141 sessionize_aggregate=0.27086 write_parquet=0.0918283 \n{\"user_rows\":2231608,\"campaign_rows\":28014,\"sessions\":3377154,\"events\":19625650,\"revenue_cents\":6675779950,\"elapsed_seconds\":1.54564}",
+          "round": 3,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 0.509200447000012,
+          "container_seconds": 0.349077897,
+          "container_started_at": "2026-11-21T21:11:21.924798718Z",
+          "container_finished_at": "2026-11-21T21:11:22.273876615Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "candidate"
+        }
+      ],
+      "comparisons": [
+        {
+          "round": 1,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2231608 vs 2231608; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 2,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2231608 vs 2231608; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 3,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 2231608 vs 2231608; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "container_seconds": {
+            "min": 1.669954684,
+            "median": 1.689036845,
+            "max": 1.693717927
+          },
+          "wall_seconds": {
+            "min": 1.8365832570000293,
+            "median": 1.863233148000063,
+            "max": 8.780522463000011
+          }
+        },
+        "candidate": {
+          "container_seconds": {
+            "min": 0.33842693,
+            "median": 0.345202901,
+            "max": 0.349077897
+          },
+          "wall_seconds": {
+            "min": 0.5071628440000495,
+            "median": 0.509200447000012,
+            "max": 0.514978109000026
+          }
+        }
+      },
+      "correctness": "Both complete tables match in all 3 pairs"
+    },
+    {
+      "seed": 948307,
+      "events": 60000000,
+      "clicks": 15000000,
+      "rounds": 3,
+      "input_csv_bytes": 5630769996,
+      "runs": [
+        {
+          "wall_seconds": 10.517944409000052,
+          "container_seconds": 5.061847478,
+          "container_started_at": "2026-11-21T21:12:00.937453125Z",
+          "container_finished_at": "2026-11-21T21:12:05.999300603Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.311605 parse=2.21744 dedup_events=0.348622 resolve=0.77727 sessionize_aggregate=0.878685 write_parquet=0.300528 \n{\"user_rows\":6601416,\"campaign_rows\":28014,\"sessions\":9966291,\"events\":58812264,\"revenue_cents\":20610334350,\"elapsed_seconds\":4.85}",
+          "round": 1,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 1.0849031590000777,
+          "container_seconds": 0.902517076,
+          "container_started_at": "2026-11-21T21:12:06.195924283Z",
+          "container_finished_at": "2026-11-21T21:12:07.098441359Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 1,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 1.0900936919999822,
+          "container_seconds": 0.915562952,
+          "container_started_at": "2026-11-21T21:12:10.101067303Z",
+          "container_finished_at": "2026-11-21T21:12:11.016630255Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 2,
+          "implementation": "candidate"
+        },
+        {
+          "wall_seconds": 5.1679483169999685,
+          "container_seconds": 4.976931595,
+          "container_started_at": "2026-11-21T21:12:11.18874008Z",
+          "container_finished_at": "2026-11-21T21:12:16.165671675Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.314598 parse=2.11402 dedup_events=0.348272 resolve=0.770376 sessionize_aggregate=0.873069 write_parquet=0.305326 \n{\"user_rows\":6601416,\"campaign_rows\":28014,\"sessions\":9966291,\"events\":58812264,\"revenue_cents\":20610334350,\"elapsed_seconds\":4.7415}",
+          "round": 2,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 5.126601923000067,
+          "container_seconds": 4.933938881,
+          "container_started_at": "2026-11-21T21:12:19.089764279Z",
+          "container_finished_at": "2026-11-21T21:12:24.02370316Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "baseline",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] baseline\nsetup=0.315227 parse=2.11502 dedup_events=0.357369 resolve=0.771606 sessionize_aggregate=0.88012 write_parquet=0.267674 \n{\"user_rows\":6601416,\"campaign_rows\":28014,\"sessions\":9966291,\"events\":58812264,\"revenue_cents\":20610334350,\"elapsed_seconds\":4.72307}",
+          "round": 3,
+          "implementation": "baseline"
+        },
+        {
+          "wall_seconds": 1.0683817340000132,
+          "container_seconds": 0.899191224,
+          "container_started_at": "2026-11-21T21:12:24.211817561Z",
+          "container_finished_at": "2026-11-21T21:12:25.111008785Z",
+          "image_id": "sha256:33bbe1e1ce703e45805d242aa959c534b45a177df7db38e497b479382bb46553",
+          "exit_code": 0,
+          "docker_start_exit_code": 0,
+          "oom_killed": false,
+          "container_error": "",
+          "cpu_limit_nanocpus": 4000000000,
+          "memory_limit_bytes": 12884901888,
+          "cpuset_cpus": "0,1,2,3",
+          "extra_environment": {
+            "SS_ENGINE": "fast",
+            "SS_ENGINE_TRACE": "1"
+          },
+          "memory_plus_swap_limit_bytes": 12884901888,
+          "pids_limit": 4096,
+          "stdout": "",
+          "stderr": "[engine] fast",
+          "round": 3,
+          "implementation": "candidate"
+        }
+      ],
+      "comparisons": [
+        {
+          "round": 1,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 6601416 vs 6601416; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 2,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 6601416 vs 6601416; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        },
+        {
+          "round": 3,
+          "exit_code": 0,
+          "stdout": "user_daily: rows 6601416 vs 6601416; only in A 0; only in B 0; duplicate keys 0 vs 0\ncampaign_daily: rows 28014 vs 28014; only in A 0; only in B 0; duplicate keys 0 vs 0\nMATCH"
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "container_seconds": {
+            "min": 4.933938881,
+            "median": 4.976931595,
+            "max": 5.061847478
+          },
+          "wall_seconds": {
+            "min": 5.126601923000067,
+            "median": 5.1679483169999685,
+            "max": 10.517944409000052
+          }
+        },
+        "candidate": {
+          "container_seconds": {
+            "min": 0.899191224,
+            "median": 0.902517076,
+            "max": 0.915562952
+          },
+          "wall_seconds": {
+            "min": 1.0683817340000132,
+            "median": 1.0849031590000777,
+            "max": 1.0900936919999822
+          }
+        }
+      },
+      "correctness": "Both complete tables match in all 3 pairs"
+    }
+  ],
+  "ci_run_url": "https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44949538888"
+}
+
