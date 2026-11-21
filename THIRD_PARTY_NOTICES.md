@@ -19,6 +19,9 @@ Local changes integrate that implementation as a guarded fast engine:
   entry points are removed. Production execution always processes the input.
 - Descriptor preallocation uses `F_DUPFD_CLOEXEC` to avoid replacing an existing
   descriptor. Optional engine tracing reports the fallback reason.
+- The Rust build disables the unused PKU feature explicitly. CPU dispatch still
+  requires the remaining Cascade Lake instructions and OS AVX-512 state support;
+  it accepts AVX-512 VMs that do not expose protection keys.
 - The original `src/generic/` implementation remains as uncompiled upstream
   reference material; it is replaced at runtime by the C++ fallback.
 

@@ -15,8 +15,8 @@ static bool fast_cpu() {
         __get_cpuid_max(0x80000000, nullptr) < 0x80000001)
         return false;
 
-    // Cascade Lake's scalar/SIMD features, not only the explicit AVX-512
-    // intrinsics: LLVM may use any feature enabled by target-cpu=cascadelake.
+    // Match fast/.cargo/config.toml: Cascade Lake with PKU disabled. LLVM may
+    // use any remaining enabled feature, not only the explicit intrinsics.
     __cpuid_count(1, 0, a, b, c, d);
     constexpr unsigned leaf1 =
         (1u << 0) | (1u << 1) | (1u << 9) | (1u << 12) | (1u << 13) |
@@ -40,8 +40,7 @@ static bool fast_cpu() {
         (1u << 23) | (1u << 24) | (1u << 28) | (1u << 30) | (1u << 31);
     // FSGSBASE, BMI1, AVX2, BMI2, INVPCID, AVX512F/DQ, RDSEED, ADX,
     // CLFLUSHOPT, CLWB, AVX512CD/BW/VL.
-    constexpr unsigned leaf7c = (1u << 3) | (1u << 4) | (1u << 11);
-    // PKU, OS-enabled PKU, AVX512VNNI.
+    constexpr unsigned leaf7c = (1u << 11); // AVX512VNNI; PKU/OSPKE not required.
     if ((b & leaf7b) != leaf7b || (c & leaf7c) != leaf7c)
         return false;
     __cpuid_count(0x80000001, 0, a, b, c, d);

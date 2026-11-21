@@ -12,7 +12,9 @@ cargo build --locked --release --target x86_64-unknown-linux-musl
 
 The executable is `target/x86_64-unknown-linux-musl/release/pipeline`. Install it
 as `shopping-sessions-fast` beside the existing `shopping-sessions` C++ executable.
-The build targets Cascade Lake and must only run after a CPU/OS feature check.
+The build targets Cascade Lake with the unused PKU feature disabled and must only
+run after a CPU/OS feature check. Disabling PKU also permits AVX-512-capable VMs
+that do not expose memory protection keys; the AVX-512 state checks remain required.
 Inputs are read from `DATA_DIR` (default `/data`) and outputs go to `OUTPUT_DIR`
 (default `/output`); `NCPU` defaults to 8. No external Rust crates are required.
 

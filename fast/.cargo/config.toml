@@ -1,2 +1,4 @@
 [build]
-rustflags = ["-C", "target-cpu=cascadelake", "-C", "relocation-model=static", "-C", "llvm-args=-x86-branches-within-32B-boundaries", "-C", "llvm-args=-x86-pad-max-prefix-size=5"]
+# PKU is unused and can be masked on otherwise compatible virtual CPUs.
+# Keep this feature contract synchronized with pipeline/dispatch.cpp.
+rustflags = ["-C", "target-cpu=cascadelake", "-C", "target-feature=-pku", "-C", "relocation-model=static", "-C", "llvm-args=-x86-branches-within-32B-boundaries", "-C", "llvm-args=-x86-pad-max-prefix-size=5"]
