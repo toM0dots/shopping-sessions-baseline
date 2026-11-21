@@ -71,12 +71,14 @@ Validation of the updated binary:
   reference at both `NCPU=1` and `NCPU=8` (`logs/native-v2-generated-checks.log`).
 - All 14 paired rounds match both complete tables, including the generated 20M
   input: 2,249,563 user/day rows and 28,014 campaign/day rows.
-- `.github/workflows/native.yml` builds the Linux container and runs all fixtures
-  with read-only root, network disabled and UID 1000, at 2 CPUs / 6 GiB. This is a
-  portability check, not a competition performance benchmark.
+- **Linux container build and all 36 fixtures pass** in
+  [GitHub Actions](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44842344593),
+  with read-only root, network disabled and UID 1000, at 2 CPUs / 6 GiB.
+  See `logs/linux-container-ci.json`. This is a portability check, not a competition
+  performance benchmark; `.github/workflows/native.yml` repeats it on code changes.
 
-Docker is unavailable on the development machine; the workflow provides the Linux
-check after publishing. The hidden portal input, 60M final workload and cold-cache
+Docker is unavailable on the development machine; Linux validation ran in CI.
+The hidden portal input, 60M final workload and cold-cache
 performance remain unmeasured. No submission is made by these scripts.
 The exploratory `logs/paired-20m-initial.json` overlapped correctness checks and is
 explicitly excluded from reported speedups. Published logs replace the local
