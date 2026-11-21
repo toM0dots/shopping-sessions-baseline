@@ -1195,19 +1195,28 @@ static void write_table(const fs::path &path, std::shared_ptr<arrow::Table> tabl
                                      properties.build(), arrow_properties));
     check(stream->Close());
 }
-// Rows from shards [first, last) form one Parquet part file.
+// Calls f for rows [first, last) of the concatenation of all lists.
+template <class F>
+static void each_row(const std::vector<std::vector<UserRow>> &lists, size_t first, size_t last, F f) {
+    size_t base = 0;
+    for (auto &list : lists) {
+        size_t from = std::max(first, base), to = std::min(last, base + list.size());
+        for (size_t i = from; i < to; ++i)
+            f(list[i - base]);
+        base += list.size();
+        if (base >= last)
+            break;
+    }
+}
+// Rows [first, last) of all workers' rows, in order, form one Parquet part.
 static void write_users(const fs::path &path,
                         const std::vector<std::vector<UserRow>> &results, size_t first,
                         size_t last, const std::vector<SV> &categories) {
     arrow::StringBuilder user, category;
     arrow::Date32Builder day;
     arrow::Int64Builder sessions, events, revenue;
-    size_t n = 0, bytes = 0;
-    for (size_t s = first; s < last; ++s) {
-        n += results[s].size();
-        for (auto &r : results[s])
-            bytes += r.person.size();
-    }
+    size_t n = last - first, bytes = 0;
+    each_row(results, first, last, [&](const UserRow &r) { bytes += r.person.size(); });
     check(user.Reserve(n));
     check(user.ReserveData(bytes));
     check(category.Reserve(n));
@@ -1215,8 +1224,7 @@ static void write_users(const fs::path &path,
     check(sessions.Reserve(n));
     check(events.Reserve(n));
     check(revenue.Reserve(n));
-    for (size_t s = first; s < last; ++s)
-        for (auto &r : results[s]) {
+    each_row(results, first, last, [&](const UserRow &r) {
             char buf[16];
             SV name = r.person.text(buf);
             check(user.Append(name.data(), name.size()));
@@ -1230,7 +1238,7 @@ static void write_users(const fs::path &path,
                 auto c = categories[r.category];
                 check(category.Append(c.data(), c.size()));
             }
-        }
+        });
     auto schema = arrow::schema(
         {arrow::field("user_id", arrow::utf8()), arrow::field("day", arrow::date32()),
          arrow::field("sessions", arrow::int64()), arrow::field("events", arrow::int64()),
@@ -1646,14 +1654,10 @@ static int run() {
         for (auto &part : user_rows)
             total_rows += part.size();
         size_t parts = std::max<size_t>(1, std::min(threads, total_rows / 262144));
-        std::vector<size_t> bounds{0};
-        for (size_t s = 0, acc = 0; s < user_rows.size(); ++s) {
-            acc += user_rows[s].size();
-            if (bounds.size() < parts && acc * parts >= total_rows * bounds.size())
-                bounds.push_back(s + 1);
-        }
-        bounds.resize(parts);
-        bounds.push_back(user_rows.size());
+        // Equal row ranges across all workers' rows.
+        std::vector<size_t> bounds;
+        for (size_t i = 0; i <= parts; ++i)
+            bounds.push_back(total_rows * i / parts);
         parallel(parts + 1, std::min(threads, parts + 1), [&](size_t i, size_t) {
             if (i == parts)
                 write_campaigns(out, daily, campaigns);
