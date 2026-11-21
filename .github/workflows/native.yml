@@ -71,12 +71,13 @@ jobs:
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[benchmark]')
         run: .venv/bin/python scripts/benchmark_linux.py
       - name: Prepare generator and native engine binaries
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[fast-benchmark]')
+        if: github.event_name == 'push' && (contains(github.event.head_commit.message, '[fast-benchmark]') || contains(github.event.head_commit.message, '[fast-check]'))
         run: |
+          lscpu
           git fetch --depth 1 origin c0bcee19170616f31e54656a65466e37aca8255d
           .venv/bin/python scripts/benchmark_fastpath.py --prepare-only
       - name: Check generator-aware engine against independent reference
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[fast-benchmark]')
+        if: github.event_name == 'push' && (contains(github.event.head_commit.message, '[fast-benchmark]') || contains(github.event.head_commit.message, '[fast-check]'))
         run: |
           .venv/bin/python scripts/check_generator_fastpath.py build/fastpath-ci/generator-target/release/generate \
             --candidate build/fastpath-ci/bin/shopping-sessions-dispatch \

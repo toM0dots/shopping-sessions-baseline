@@ -30,7 +30,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = ("user_daily", "campaign_daily")
 WIDTHS = {"events": 7, "clicks": 4, "links": 2}
-MUTATIONS = ("shuffled", "opaque_ids", "permuted_event_ids", "cross_person_links",
+MUTATIONS = ("shuffled", "opaque_ids", "mixed_ids", "permuted_event_ids", "cross_person_links",
              "earliest_invalid", "unusual_timestamps", "unusual_catalog",
              "wide_window", "partial_output_fallback")
 
@@ -116,6 +116,54 @@ def mutate(data, name, seed):
                 if fields[i]:
                     fields[i] = b"opaque-" + kind + b"-" + fields[i].hex().encode()
         return {kind: rewrite(data, kind, lambda f, cols=cols: change(f, cols)) for kind, cols in columns.items()}
+    if name == "mixed_ids":
+        # A few rare users and IDs leave the generated majority available for
+        # key recovery. Rename every occurrence, including links and duplicates.
+        event_counts = Counter(f[0] for f in rows(data, "events") if f[0])
+        click_counts = Counter(f[0] for f in rows(data, "clicks") if f[0])
+        user_counts = Counter(f[1] for kind in ("events", "clicks") for f in rows(data, kind) if f[1])
+        known_users = set(user_counts)
+        known_users.update(x for pair in rows(data, "links") for x in pair if x)
+        mappings = {}
+        for kind, counts, known in (("event", event_counts, set(event_counts)),
+                                    ("click", click_counts, set(click_counts)),
+                                    ("user", user_counts, known_users)):
+            selected = sorted(counts, key=lambda key: (counts[key], key))[:6]
+            if kind == "event":
+                duplicate = next((key for key in sorted(counts) if counts[key] > 1), None)
+                if duplicate is not None:
+                    selected = [duplicate] + [key for key in selected if key != duplicate][:5]
+            prefix = {"event": b"e", "click": b"k", "user": b"u"}[kind]
+            # These eight-digit base-36 suffixes are canonical but exceed 2^40.
+            replacement = [b"long-" + kind.encode() + b"-" + b"x" * 300,
+                           prefix + b"zzzzzzzz", prefix + b"zzzzzzzy",
+                           b"rare-" + kind.encode() + b"-with-space \r",
+                           ("rare-" + kind + "-\u03bc").encode(), prefix + b"1"]
+            mapping = {}
+            for old, new in zip(selected, replacement):
+                while new in known or new in mapping.values():
+                    new += b"x"
+                mapping[old] = new
+            mappings[kind] = mapping
+        if not mappings["event"]:
+            raise ValueError("no event ID for mixed-ID mutation")
+        long_old = next(iter(mappings["event"]))
+        duplicate = max((f for f in rows(data, "events") if f[0] == long_old), key=lambda f: f[3]).copy()
+        def change(fields, columns):
+            for col, kind in columns:
+                fields[col] = mappings[kind].get(fields[col], fields[col])
+        columns = {"events": ((0, "event"), (1, "user")),
+                   "clicks": ((0, "click"), (1, "user")),
+                   "links": ((0, "user"), (1, "user"))}
+        changed = {kind: rewrite(data, kind, lambda f, cols=cols: change(f, cols)) for kind, cols in columns.items()}
+        change(duplicate, columns["events"])
+        duplicate[3] = stamp(f1(duplicate[3]) + timedelta(seconds=1))
+        (data / "events/mixed-id-duplicate.csv").write_bytes(
+            b"event_id,user_id,ts,ingest_ts,event_type,product_id,price_cents\n" +
+            b",".join(b'"' + field + b'"' for field in duplicate) + b"\n")
+        return {"rows_changed": changed, "ids_renamed": {kind: len(m) for kind, m in mappings.items()},
+                "id_lengths_bytes": {kind: [len(x) for x in m.values()] for kind, m in mappings.items()},
+                "additional_later_long_id_duplicate": 1}
     if name == "permuted_event_ids":
         ids = sorted({f[0] for f in rows(data, "events") if f[0]})
         shuffled = ids.copy()
@@ -247,6 +295,8 @@ def run(command, data, output, threads, timeout):
 
 
 def compare(actual, expected, timeout):
+    if any((actual / f"{table}.csv").exists() for table in TABLES):
+        raise RuntimeError(f"candidate must produce Parquet table directories: {actual}")
     result = subprocess.run([sys.executable, str(ROOT / "scripts/compare.py"), str(actual), str(expected)],
                             capture_output=True, text=True, timeout=timeout)
     if result.returncode or result.stdout.splitlines()[-1:] != ["MATCH"]:
@@ -316,6 +366,8 @@ def main():
                     sample = {"threads": threads, **run(report["candidate"], data, output, threads, args.timeout)}
                     case["runs"].append(sample)
                     sample["comparison"] = compare(output, reference, args.timeout)
+                    if args.mode_check == "strict" and sample["mode"] == "unknown":
+                        raise RuntimeError(f"seed={seed} {name} threads={threads}: missing engine trace")
                     expected_mode = "fast" if name in ("normal", "shuffled") else (
                         "fallback" if name in ("opaque_ids", "unusual_catalog", "wide_window", "partial_output_fallback") else None)
                     if args.mode_check == "strict" and expected_mode and sample["mode"] != expected_mode:
