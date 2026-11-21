@@ -12,6 +12,19 @@ through exit. Its final workload is about 60M events. The public 1M input is a
 smaller correctness check. The last reported **7.3-second portal result is not a
 measurement of this revision**; a new portal run is still needed.
 
+The latest **Linux container comparison** against `a7cd5c1` measured
+**7.285 → 5.993 s median on generated 20M events / 5M clicks: 17.7% lower runtime**.
+The candidate was faster in all six alternating pairs, and both complete output
+tables matched in every pair. This ran on a GitHub Linux runner with **4 vCPUs
+and a 12 GiB container limit**. Timing includes Docker client startup and cleanup;
+it is separate from the portal's 7.3 s result and its 8-vCPU environment.
+
+Candidate runs ranged from 5.971–7.146 s; baseline runs from 7.191–16.257 s.
+The slower first baseline invocation is retained. All samples and provenance are
+in `logs/linux-v3-final-20m.json`; the
+[successful workflow](https://github.com/toM0dots/shopping-sessions-baseline/actions/runs/44845023821)
+also verifies the Linux build, sanitizer checks and all 36 fixtures.
+
 The latest local comparisons use the immediately previous published version,
 `a7cd5c1`, as baseline. Each round alternates execution order and compares both
 complete output tables after timing:
@@ -21,7 +34,7 @@ complete output tables after timing:
 | Generated 20M events / 5M clicks, seed 17 | 6 | 11.627 s | 11.296 s | 2.8% |
 | Public 1M events / 250K clicks, seed 1 | 10 | 0.466 s | 0.427 s | 8.3% |
 
-The 20M candidate ranged from **9.230 to 13.297 seconds**, versus 10.607–13.089 s
+The Mac 20M candidate ranged from **9.230 to 13.297 seconds**, versus 10.607–13.089 s
 for the baseline. This batch shows a modest median improvement amid substantial
 variation, not a repeatable multi-second gain. All samples, including slower
 candidate runs, are retained in `logs/paired-v3-final-20m.json` and
@@ -64,7 +77,9 @@ not predict the portal score or establish cold-cache performance.
 - Each SIMD/scalar parser run passes **361,548 CSV and 203,052 timestamp
   comparisons** under AddressSanitizer and UndefinedBehaviorSanitizer, including
   protected-page input boundaries (`logs/native-v3-parser-*.log`).
-- All 16 final paired rounds match both complete tables. The 20M input contains
+- **Linux container build, both sanitizer modes, and 36/36 container fixtures
+  pass** (`logs/linux-container-v3-ci.json`).
+- All 16 local and 6 Linux final paired rounds match both complete tables. The 20M input contains
   1,921,192,469 CSV bytes and yields 2,249,563 user/day and 28,014 campaign/day rows.
 
 The Linux workflow builds the native container and runs parser checks plus all
@@ -154,6 +169,16 @@ python scripts/profile_lifecycle.py --data dev --runs 5 --threads 8 \
 python scripts/check_parser_semantics.py
 python scripts/check_parser_semantics.py --scalar
 ```
+
+With Linux, Docker and Cargo available, reproduce the container comparison with:
+
+```sh
+make build IMAGE=shopping-sessions:ci
+python scripts/benchmark_linux.py
+```
+
+This downloads the checksum-pinned official generator, builds `a7cd5c1` as the
+baseline, generates fresh 20M input, and writes `logs/linux-v3-final-20m.json`.
 
 The baseline can still be run independently:
 
