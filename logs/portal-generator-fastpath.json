@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "source": "Datathon portal UI",
+  "portal_url": "https://www.joinbuilders.org/buildathon/tracks/shopping-sessions",
+  "observed_at_utc": "2026-11-21T21:32:58Z",
+  "submission_id": "BB-1408C9EE",
+  "repository_url": "https://github.com/toM0dots/shopping-sessions-baseline",
+  "candidate_commit": "fd56b794f7efe74bcb4e8d32bd653f4df923c7fb",
+  "commit_display": "fd56b794f7ef",
+  "status": "Scored",
+  "runtime_seconds": 0.31,
+  "runtime_display": "0.31 s",
+  "final_entry_display": "Entered in the final (your best score)",
+  "leaderboard_rank_at_observation": 17,
+  "scorer": "shopping-sessions-4",
+  "workload": {
+    "type": "hidden practice input",
+    "approximate_events": 20000000
+  },
+  "portal_configuration": {
+    "pinned_vcpus": 8,
+    "memory_gb_displayed": 24,
+    "swap": "disabled",
+    "timing_scope": "Container start through exit",
+    "aggregation_policy": "Median of three runs when the first run finishes below 20 seconds"
+  },
+  "correctness": {
+    "scorer_accepted": true,
+    "evidence": "Portal reached Scored and selected this submission as the best final entry; detailed correctness results were not exposed"
+  },
+  "individual_runtime_samples_seconds": null,
+  "selected_engine": null,
+  "previous_submission": {
+    "submission_id": "BB-4EC0915E",
+    "candidate_commit": "1e2e1695b22429ac8405206b9ee7881a4b745eee",
+    "commit_display": "1e2e1695b224",
+    "status": "Scored",
+    "runtime_seconds": 1.37,
+    "runtime_display": "1.37 s",
+    "selected_engine": null
+  },
+  "notes": "Runtime values preserve the portal's displayed precision. This actual portal result is separate from the four-CPU GitHub CI benchmarks. The portal did not expose individual timings, detailed correctness comparisons or engine-selection logs, so the previous submission's slower result does not establish that it used the C++ fallback."
+}

@@ -25,6 +25,18 @@ CPU. `SS_ENGINE_TRACE=1` reports selection and any fallback on stderr. Build wit
 `docker build --build-arg BUILD_JOBS=4 -t shopping-sessions:ci .`; native macOS builds
 continue to use C++.
 
+On the [Datathon portal](https://www.joinbuilders.org/buildathon/tracks/shopping-sessions),
+submission **`BB-1408C9EE`** at
+[`fd56b794`](https://github.com/toM0dots/shopping-sessions-baseline/commit/fd56b794f7efe74bcb4e8d32bd653f4df923c7fb)
+reached **Scored: 0.31 s** on the hidden practice input and was marked
+**Entered in the final (your best score)**, observed on 2026-11-21 at 21:32:58 UTC.
+The portal's `shopping-sessions-4` scorer uses about 20M events, eight pinned vCPUs,
+24 GB RAM and no swap; its policy reports the median of three runs when the first
+finishes below 20 seconds. The earlier submission `BB-4EC0915E` at `1e2e1695b224`
+scored **1.37 s**. The portal accepted the corrected submission, but did not expose
+individual timings, detailed correctness results or engine-selection logs.
+See [`logs/portal-generator-fastpath.json`](logs/portal-generator-fastpath.json).
+
 The verified production source is [`98d5116`](https://github.com/toM0dots/shopping-sessions-baseline/commit/98d51161f0cfbcd6364e3ae513e6a00fbf2ec77d).
 On an Intel Xeon 6975P-C Linux runner, with **four pinned logical CPUs, 12 GiB and no
 swap**, alternating fresh-container runs produced these medians:
@@ -38,8 +50,9 @@ swap**, alternating fresh-container runs produced these medians:
 These measure Docker container start through exit, including CSV reads, computation
 and Parquet writing. Both engines run from the same immutable image; the baseline
 selects the unchanged C++ engine. This is approximately a **4.9x speedup at 20M** and
-**5.5x at 60M**, not a measured portal score. The portal uses eight vCPUs and different
-inputs/hardware. **0.30 s remains the portal target; it has not been verified here.**
+**5.5x at 60M** in CI. These four-CPU measurements are separate from the **0.31 s
+portal result** above, which uses eight vCPUs and different inputs/hardware.
+**0.30 s remains the portal target.**
 
 Both complete output tables matched exactly, with no duplicate keys, in **all 11
 pairs**. The 60M comparison includes 6,601,416 user-day rows and 28,014 campaign-day
@@ -320,8 +333,8 @@ The [portal practice workload](https://www.joinbuilders.org/buildathon/tracks/sh
 uses **about 20M hidden events, 8 vCPUs and 24 GB RAM**, timed from container start
 through exit. Its final workload is about 60M events. The public 1M input is a
 smaller correctness check. The historical **7.3-second portal result came from
-an earlier revision**. The generator-aware engine's current measurements are at
-the top of this document; no portal score is claimed for that engine.
+an earlier revision**. The current portal result and generator-aware engine's CI
+measurements are recorded separately at the top of this document.
 
 The v3 **Linux container comparison** against `a7cd5c1` measured
 **7.285 → 5.993 s median on generated 20M events / 5M clicks: 17.7% lower runtime**.
@@ -400,7 +413,8 @@ containers on the generated 20M input. This optional comparison uses 4 vCPUs /
 12 GiB on a GitHub runner and includes Docker client startup and runner cleanup;
 it is not the portal's exact environment or timer. The benchmark JSON is printed
 in the workflow log for retrieval. Docker is unavailable on the local Mac.
-The hidden portal input and the 60M final workload remain unmeasured.
+The hidden portal input and the 60M final workload were not measured in this
+historical update.
 
 ### Earlier measurements
 
